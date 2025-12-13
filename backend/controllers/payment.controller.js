@@ -18,7 +18,7 @@ export const createCheckoutSession = async (req, res) => {
 
 			return {
 				price_data: {
-					currency: "usd",
+					currency: 'kes',
 					product_data: {
 						name: product.name,
 						images: [product.image],
@@ -100,7 +100,7 @@ export const checkoutSuccess = async (req, res) => {
 					quantity: product.quantity,
 					price: product.price,
 				})),
-				totalAmount: session.amount_total / 100, // convert from cents to dollars,
+				totalAmount: session.amount_total / 100, // convert from cents to KES,
 				stripeSessionId: sessionId,
 			});
 
@@ -132,7 +132,7 @@ async function createNewCoupon(userId) {
 
 	const newCoupon = new Coupon({
 		code: "GIFT" + Math.random().toString(36).substring(2, 8).toUpperCase(),
-		discountPercentage: 10,
+		discountPercentage: 3,
 		expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
 		userId: userId,
 	});
