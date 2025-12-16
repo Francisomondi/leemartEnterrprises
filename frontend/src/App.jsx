@@ -9,6 +9,7 @@ import AboutPage from "./pages/AboutPage";
 import ContactPage from "./pages/ContactPage";
 
 import Navbar from "./components/Navbar";
+import Footer from "./components/Footer";
 import { Toaster } from "react-hot-toast";
 import { useUserStore } from "./stores/useUserStore";
 import { useEffect } from "react";
@@ -21,20 +22,21 @@ import PurchaseCancelPage from "./pages/PurchaseCancelPage";
 function App() {
 	const { user, checkAuth, checkingAuth } = useUserStore();
 	const { getCartItems } = useCartStore();
+
 	useEffect(() => {
 		checkAuth();
 	}, [checkAuth]);
 
 	useEffect(() => {
 		if (!user) return;
-
 		getCartItems();
 	}, [getCartItems, user]);
 
 	if (checkingAuth) return <LoadingSpinner />;
 
 	return (
-		<div className='min-h-screen bg-gray-900 text-white relative overflow-hidden'>
+		<div className='min-h-screen bg-gray-900 text-white relative overflow-hidden flex flex-col'>
+			
 			{/* Background gradient */}
 			<div className='absolute inset-0 overflow-hidden'>
 				<div className='absolute inset-0'>
@@ -42,28 +44,38 @@ function App() {
 				</div>
 			</div>
 
-			<div className='relative z-50 pt-20'>
+			{/* Content */}
+			<div className='relative z-50 flex flex-col min-h-screen'>
 				<Navbar />
-				<Routes>
-					<Route path='/' element={<HomePage />} />
-					<Route path='/signup' element={!user ? <SignUpPage /> : <Navigate to='/' />} />
-					<Route path='/login' element={!user ? <LoginPage /> : <Navigate to='/' />} />
-					<Route
-						path='/secret-dashboard'
-						element={user?.role === "admin" ? <AdminPage /> : <Navigate to='/login' />}
-					/>
-					<Route path='/category/:category' element={<CategoryPage />} />
-					<Route path='/cart' element={user ? <CartPage /> : <Navigate to='/login' />} />
-					<Route
-						path='/purchase-success'
-						element={user ? <PurchaseSuccessPage /> : <Navigate to='/login' />}
-					/>
-					<Route path='/purchase-cancel' element={user ? <PurchaseCancelPage /> : <Navigate to='/login' />} />
-					<Route path="/about" element={<AboutPage />} />
-					<Route path="/contact" element={<ContactPage />} />
-					
-				</Routes>
+
+				<main className='flex-grow pt-20'>
+					<Routes>
+						<Route path='/' element={<HomePage />} />
+						<Route path='/signup' element={!user ? <SignUpPage /> : <Navigate to='/' />} />
+						<Route path='/login' element={!user ? <LoginPage /> : <Navigate to='/' />} />
+						<Route
+							path='/secret-dashboard'
+							element={user?.role === "admin" ? <AdminPage /> : <Navigate to='/login' />}
+						/>
+						<Route path='/category/:category' element={<CategoryPage />} />
+						<Route path='/cart' element={user ? <CartPage /> : <Navigate to='/login' />} />
+						<Route
+							path='/purchase-success'
+							element={user ? <PurchaseSuccessPage /> : <Navigate to='/login' />}
+						/>
+						<Route
+							path='/purchase-cancel'
+							element={user ? <PurchaseCancelPage /> : <Navigate to='/login' />}
+						/>
+						<Route path='/about' element={<AboutPage />} />
+						<Route path='/contact' element={<ContactPage />} />
+					</Routes>
+				</main>
+
+				{/* Footer now appears on ALL pages */}
+				<Footer />
 			</div>
+
 			<Toaster />
 		</div>
 	);
