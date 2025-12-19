@@ -3,7 +3,9 @@ import toast from "react-hot-toast";
 import axios from "../lib/axios";
 
 export const useProductStore = create((set) => ({
+	
 	products: [],
+	selectedProduct: null,
 	loading: false,
 
 	setProducts: (products) => set({ products }),
@@ -40,6 +42,18 @@ export const useProductStore = create((set) => ({
 			toast.error(error.response.data.error || "Failed to fetch products");
 		}
 	},
+	fetchProductById: async (id) => {
+		set({ isLoading: true, selectedProduct: null });
+
+		try {
+			const res = await axios.get(`/products/${id}`);
+			set({ selectedProduct: res.data, isLoading: false });
+		} catch (error) {
+			console.error("Fetch product error:", error);
+			set({ isLoading: false });
+		}
+	},
+
 	deleteProduct: async (productId) => {
 		set({ loading: true });
 		try {

@@ -7,6 +7,7 @@ import AdminPage from "./pages/AdminPage";
 import CategoryPage from "./pages/CategoryPage";
 import AboutPage from "./pages/AboutPage";
 import ContactPage from "./pages/ContactPage";
+import ProductPage from "./pages/ProductPage";
 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
@@ -69,6 +70,7 @@ function App() {
 						/>
 						<Route path='/about' element={<AboutPage />} />
 						<Route path='/contact' element={<ContactPage />} />
+						<Route path="/product/:id" element={<ProductPage />} />
 					</Routes>
 				</main>
 

@@ -1,45 +1,128 @@
 import toast from "react-hot-toast";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, Zap } from "lucide-react";
+import axios from "../lib/axios";
 import { useUserStore } from "../stores/useUserStore";
 import { useCartStore } from "../stores/useCartStore";
+import { Link } from "react-router-dom";
 
 const ProductCard = ({ product }) => {
 	const { user } = useUserStore();
-	const { addToCart } = useCartStore();
+
+	const cartItems = useCartStore(
+		(state) => state.cart || state.cartItems || []
+	);
+	const addToCart = useCartStore((state) => state.addToCart);
+
+	const isInCart = cartItems.some((item) => item._id === product._id);
+	const inStock = product.stock === undefined || product.stock > 0;
+
+	/* ================= ADD TO CART ================= */
 	const handleAddToCart = () => {
 		if (!user) {
-			toast.error("Please login to add products to cart", { id: "login" });
+			toast.error("Please login to add products to cart");
 			return;
-		} else {
-			// add to cart
-			addToCart(product);
+		}
+		if (isInCart) {
+			toast("Already in cart");
+			return;
+		}
+
+		addToCart(product);
+		
+	};
+
+	/* ================= BUY NOW (MPESA) ================= */
+	const handleBuyNowMpesa = async () => {
+		if (!user) {
+			toast.error("Please login first");
+			return;
+		}
+
+		if (!user.phone) {
+			toast.error("Add phone number to profile");
+			return;
+		}
+
+		try {
+			await axios.post("/api/mpesa/stk-push", {
+				phone: user.phone,
+				amount: product.price,
+			});
+
+			toast.success("📲 Check your phone to complete payment");
+		} catch (error) {
+			toast.error("❌ MPESA payment failed");
 		}
 	};
 
 	return (
-		<div className='flex w-full relative flex-col overflow-hidden rounded-lg border border-gray-700 shadow-lg'>
-			<div className='relative mx-3 mt-3 flex h-60 overflow-hidden rounded-xl'>
-				<img className='object-cover w-full' src={product.image} alt='product image' />
-				<div className='absolute inset-0 bg-black bg-opacity-20' />
-			</div>
+		<div className='group relative flex w-full flex-col overflow-hidden rounded-lg border border-gray-700 bg-gray-800 shadow-lg transition-transform duration-300 hover:-translate-y-1 hover:shadow-emerald-500/20'>
+			
+			{/* IMAGE */}
+			<Link to={`/product/${product._id}`}>
+				<div className='relative mx-3 mt-3 flex h-60 overflow-hidden rounded-xl'>
+				<img
+					className='h-full w-full object-cover transition-transform duration-500 group-hover:scale-105'
+					src={product.image}
+					alt={product.name}
+				/>
+				<div className='absolute inset-0 bg-black/20' />
 
-			<div className='mt-4 px-5 pb-5'>
-				<h5 className='text-xl font-semibold tracking-tight text-white'>{product.name}</h5>
-				<div className='mt-2 mb-5 flex items-center justify-between'>
-					<p>
-						<span className='text-3xl font-bold text-emerald-400'>KES {product.price}</span>
-					</p>
-				</div>
-				<button
-					className='flex items-center justify-center rounded-lg bg-emerald-600 px-5 py-2.5 text-center text-sm font-medium
-					 text-white hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-300'
-					onClick={handleAddToCart}
+				{/* STOCK BADGE */}
+				<span
+					className={`absolute left-2 top-2 rounded px-2 py-1 text-xs font-semibold ${
+						inStock ? "bg-emerald-600" : "bg-red-600"
+					}`}
 				>
-					<ShoppingCart size={22} className='mr-2' />
-					Add to cart
-				</button>
+					{inStock ? "In Stock" : "Out of Stock"}
+				</span>
+			</div>
+			</Link>
+			
+
+			{/* CONTENT */}
+			<div className='mt-4 px-5 pb-5'>
+				<Link
+					to={`/product/${product._id}`}
+					className='hover:text-emerald-400'
+				>
+					<h5 className='text-xl font-semibold text-white'>
+						{product.name}
+					</h5>
+				</Link>
+
+
+				<p className='mt-2 text-3xl font-bold text-emerald-400'>
+					KES {product.price}
+				</p>
+
+				{/* ACTION BUTTONS */}
+				<div className='mt-4 space-y-2'>
+					<button
+						onClick={handleAddToCart}
+						disabled={isInCart || !inStock}
+						className={`flex w-full items-center justify-center rounded-lg px-5 py-2.5 text-sm font-medium text-white transition ${
+							isInCart || !inStock
+								? "cursor-not-allowed bg-gray-600"
+								: "bg-emerald-600 hover:bg-emerald-700"
+						}`}
+					>
+						<ShoppingCart size={20} className='mr-2' />
+						{isInCart ? "In Cart" : "Add to Cart"}
+					</button>
+
+					<button
+						onClick={handleBuyNowMpesa}
+						disabled={!inStock}
+						className='flex w-full items-center justify-center rounded-lg bg-green-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-green-700'
+					>
+						<Zap size={18} className='mr-2' />
+						Buy Now (M-PESA)
+					</button>
+				</div>
 			</div>
 		</div>
 	);
 };
+
 export default ProductCard;

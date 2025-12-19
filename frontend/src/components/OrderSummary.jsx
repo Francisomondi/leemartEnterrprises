@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { MoveRight } from "lucide-react";
 import { loadStripe } from "@stripe/stripe-js";
 import axios from "../lib/axios";
+import { useState } from "react";
 
 const stripePromise = loadStripe(
 	"pk_test_51QECS1CuN2A0ZRg3Rd2xBu36onklMc2SDdezYRPo6C4Wuju4UkxQye229izbiYPtwK6t08g7WCaDzV0NZEoTMR1C00Gbcr6sIs"
@@ -12,12 +13,17 @@ const stripePromise = loadStripe(
 const OrderSummary = () => {
 	const { total, subtotal, coupon, isCouponApplied, cart } = useCartStore();
 
+	const [phone, setPhone] = useState("");
+	const [loadingMpesa, setLoadingMpesa] = useState(false);
+	const [mpesaMessage, setMpesaMessage] = useState("");
+
 	const savings = subtotal - total;
+
 	const formattedSubtotal = subtotal.toLocaleString("en-KE");
-	
 	const formattedTotal = total.toLocaleString("en-KE");
 	const formattedSavings = savings.toLocaleString("en-KE");
 
+	// 💳 STRIPE
 	const handlePayment = async () => {
 		const stripe = await stripePromise;
 		const res = await axios.post("/payments/create-checkout-session", {
@@ -30,14 +36,52 @@ const OrderSummary = () => {
 			sessionId: session.id,
 		});
 
-		if (result.error) {
-			console.error("Error:", result.error);
-		}
+		if (result.error) console.error(result.error);
 	};
 
-	const handleMpesaPayment = async =>{
-      console.log("mpesa payment ges here")
+	// 📲 MPESA
+	const handleMpesaPayment = async () => {
+	if (!phone) {
+		setMpesaMessage("❌ Enter phone number");
+		return;
 	}
+
+	// Normalize phone number
+	let formattedPhone = phone.trim();
+
+	// If user enters 2547XXXXXXXX → convert to 07XXXXXXXX
+	if (formattedPhone.startsWith("254")) {
+		formattedPhone = "0" + formattedPhone.slice(3);
+	}
+
+	// Basic validation
+	if (!/^0(7|1)\d{8}$/.test(formattedPhone)) {
+		setMpesaMessage("❌ Enter a valid Safaricom number");
+		return;
+	}
+
+	setLoadingMpesa(true);
+	setMpesaMessage("");
+
+	try {
+		const res = await axios.post(
+			"http://localhost:5000/api/mpesa/stk-push",
+			{
+				phone: formattedPhone,
+				amount: Math.round(total),
+			}
+		);
+
+		console.log("MPESA RESPONSE:", res.data);
+		setMpesaMessage("📲 Check your phone to complete payment");
+	} catch (error) {
+		console.error("MPESA ERROR:", error.response?.data || error.message);
+		setMpesaMessage("❌ MPESA payment failed");
+	} finally {
+		setLoadingMpesa(false);
+	}
+};
+
 
 	return (
 		<motion.div
@@ -50,32 +94,36 @@ const OrderSummary = () => {
 
 			<div className='space-y-4'>
 				<div className='space-y-2'>
-					<dl className='flex items-center justify-between gap-4'>
-						<dt className='text-base font-normal text-gray-300'>Original price</dt>
-						<dd className='text-base font-medium text-white'>KES {formattedSubtotal}</dd>
+					<dl className='flex justify-between'>
+						<dt className='text-gray-300'>Original price</dt>
+						<dd className='text-white'>KES {formattedSubtotal}</dd>
 					</dl>
 
 					{savings > 0 && (
-						<dl className='flex items-center justify-between gap-4'>
-							<dt className='text-base font-normal text-gray-300'>Savings</dt>
-							<dd className='text-base font-medium text-emerald-400'>-KES {formattedSavings}</dd>
+						<dl className='flex justify-between'>
+							<dt className='text-gray-300'>Savings</dt>
+							<dd className='text-emerald-400'>-KES {formattedSavings}</dd>
 						</dl>
 					)}
 
 					{coupon && isCouponApplied && (
-						<dl className='flex items-center justify-between gap-4'>
-							<dt className='text-base font-normal text-gray-300'>Coupon ({coupon.code})</dt>
-							<dd className='text-base font-medium text-emerald-400'>-{coupon.discountPercentage}%</dd>
+						<dl className='flex justify-between'>
+							<dt className='text-gray-300'>Coupon ({coupon.code})</dt>
+							<dd className='text-emerald-400'>-{coupon.discountPercentage}%</dd>
 						</dl>
 					)}
-					<dl className='flex items-center justify-between gap-4 border-t border-gray-600 pt-2'>
-						<dt className='text-base font-bold text-white'>Total</dt>
-						<dd className='text-base font-bold text-emerald-400'>KES {formattedTotal}</dd>
+
+					<dl className='flex justify-between border-t border-gray-600 pt-2'>
+						<dt className='font-bold'>Total</dt>
+						<dd className='font-bold text-emerald-400'>
+							KES {formattedTotal}
+						</dd>
 					</dl>
 				</div>
 
+				{/* STRIPE */}
 				<motion.button
-					className='flex w-full items-center justify-center rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-300'
+					className='w-full rounded-lg bg-emerald-600 px-5 py-2.5 text-white hover:bg-emerald-700'
 					whileHover={{ scale: 1.05 }}
 					whileTap={{ scale: 0.95 }}
 					onClick={handlePayment}
@@ -83,27 +131,44 @@ const OrderSummary = () => {
 					Proceed to Checkout (Card)
 				</motion.button>
 
+				{/* MPESA INPUT */}
+				<input
+					type='tel'
+					placeholder='07XXXXXXXX'
+					value={phone}
+					onChange={(e) => setPhone(e.target.value)}
+					className='w-full rounded bg-gray-900 px-4 py-2 text-white'
+				/>
+
+				{/* MPESA BUTTON */}
 				<motion.button
-					className='flex w-full items-center justify-center rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-300'
+					className='w-full rounded-lg bg-emerald-600 px-5 py-2.5 text-white hover:bg-emerald-700'
 					whileHover={{ scale: 1.05 }}
 					whileTap={{ scale: 0.95 }}
 					onClick={handleMpesaPayment}
+					disabled={loadingMpesa}
 				>
-					Proceed to Checkout (M-pesa)
+					{loadingMpesa ? "Processing..." : "Proceed to Checkout (M-PESA)"}
 				</motion.button>
 
-				<div className='flex items-center justify-center gap-2'>
-					<span className='text-sm font-normal text-gray-400'>or</span>
+				{mpesaMessage && (
+					<p className='text-center text-sm text-emerald-400'>
+						{mpesaMessage}
+					</p>
+				)}
+
+				<div className='flex justify-center gap-2'>
+					<span className='text-gray-400'>or</span>
 					<Link
 						to='/'
-						className='inline-flex items-center gap-2 text-sm font-medium text-emerald-400 underline hover:text-emerald-300 hover:no-underline'
+						className='text-emerald-400 underline hover:text-emerald-300'
 					>
-						Continue Shopping
-						<MoveRight size={16} />
+						Continue Shopping <MoveRight size={16} />
 					</Link>
 				</div>
 			</div>
 		</motion.div>
 	);
 };
+
 export default OrderSummary;
