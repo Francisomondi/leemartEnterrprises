@@ -42,7 +42,7 @@ const OrderSummary = () => {
 	// 📲 MPESA
 	const handleMpesaPayment = async () => {
 	if (!phone) {
-		setMpesaMessage("❌ Enter phone number");
+		setMpesaMessage(" Enter phone number");
 		return;
 	}
 
@@ -56,7 +56,7 @@ const OrderSummary = () => {
 
 	// Basic validation
 	if (!/^0(7|1)\d{8}$/.test(formattedPhone)) {
-		setMpesaMessage("❌ Enter a valid Safaricom number");
+		setMpesaMessage("Enter a valid Safaricom number");
 		return;
 	}
 
@@ -64,22 +64,28 @@ const OrderSummary = () => {
 	setMpesaMessage("");
 
 	try {
-		const res = await axios.post(
-			"http://localhost:5000/api/mpesa/stk-push",
+		const res = await axios.post("/mpesa/stk-push",
 			{
 				phone: formattedPhone,
-				amount: Math.round(total),
-			}
+				amount: total,
+
+			},
+			 { timeout: 25000 }
 		);
 
 		console.log("MPESA RESPONSE:", res.data);
 		setMpesaMessage("📲 Check your phone to complete payment");
 	} catch (error) {
-		console.error("MPESA ERROR:", error.response?.data || error.message);
-		setMpesaMessage("❌ MPESA payment failed");
-	} finally {
-		setLoadingMpesa(false);
-	}
+			console.error("MPESA ERROR:", error);
+			setMpesaMessage(
+				error.response?.data?.message ||
+				"Failed to send STK push"
+			);
+			}
+			finally {
+			setLoadingMpesa(false);
+			}
+
 };
 
 
@@ -141,15 +147,21 @@ const OrderSummary = () => {
 				/>
 
 				{/* MPESA BUTTON */}
-				<motion.button
-					className='w-full rounded-lg bg-emerald-600 px-5 py-2.5 text-white hover:bg-emerald-700'
-					whileHover={{ scale: 1.05 }}
-					whileTap={{ scale: 0.95 }}
-					onClick={handleMpesaPayment}
-					disabled={loadingMpesa}
-				>
-					{loadingMpesa ? "Processing..." : "Proceed to Checkout (M-PESA)"}
-				</motion.button>
+						<motion.button
+							type="button"
+							onClick={handleMpesaPayment}
+							disabled={loadingMpesa}
+							whileHover={!loadingMpesa ? { scale: 1.05 } : {}}
+							whileTap={!loadingMpesa ? { scale: 0.95 } : {}}
+							className={`w-full rounded-lg px-5 py-2.5 font-medium text-white transition
+								${loadingMpesa
+									? "bg-gray-600 cursor-not-allowed"
+									: "bg-emerald-600 hover:bg-emerald-700"}
+							`}
+						>
+							{loadingMpesa ? "📲 Waiting for phone prompt..." : "Pay with M-PESA"}
+						</motion.button>
+
 
 				{mpesaMessage && (
 					<p className='text-center text-sm text-emerald-400'>

@@ -28,7 +28,7 @@ const Navbar = () => {
 						to='/'
 						className='text-2xl font-bold text-emerald-400 flex items-center'
 					>
-						Leemart Enterprise
+						Leemart Investments
 					</Link>
 
 					{/* Desktop Nav */}

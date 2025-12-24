@@ -1,129 +1,132 @@
+
 import axios from "axios";
 import dotenv from "dotenv";
-import Payment from "../models/mpesa.model.js";
+
 
 dotenv.config();
 
-const {
-	MPESA_CONSUMER_KEY,
-	MPESA_CONSUMER_SECRET,
-	MPESA_SHORTCODE,
-	MPESA_PASSKEY,
-	MPESA_CALLBACK_URL,
-} = process.env;
+			const shortcode = process.env.MPESA_SHORTCODE
+			const passkey = process.env.MPESA_PASSKEY
+			const callbackUrl = process.env.MPESA_CALLBACK_URL
+			const consumerKey = process.env.MPESA_CONSUMER_KEY
+			const consumerSecret = process.env.MPESA_CONSUMER_SECRET
 
-// ================= ACCESS TOKEN =================
-export const getAccessToken = async () => {
-	const auth = Buffer.from(
-		`${MPESA_CONSUMER_KEY}:${MPESA_CONSUMER_SECRET}`
-	).toString("base64");
+			 const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString("base64");
+			 
 
-	const { data } = await axios.get(
-		"https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials",
-		{
-			headers: { Authorization: `Basic ${auth}` },
-		}
-	);
+export const generateToken = async (req, res, next) => {
+  try {
+    const response = await axios.get(
+      "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials",
+      {
+        headers: {
+          Authorization: `Basic ${auth}`,
+        },
+      }
+    );
 
-	return data.access_token;
+    req.mpesaToken = response.data.access_token; // ✅ attach to req
+	console.log(req.mpesaToken)
+    next();
+
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).json({
+      message: "Token generation failed",
+      error: error.message,
+    });
+  }
 };
+
+
+
+
 
 // ================= STK PUSH =================
-export const stkPush = async (req, res) => {
+export const stkPush = async (req, res) => {	
 	try {
-		const phone = req.body.phone.substring(1);
-		const amount = req.body.amount;
-		
+		let phone = req.body.phone
+		let  amount = req.body.amount;
 
-		// format phone
-		//const formattedPhone = phone.startsWith("254")
-		///	? phone
-		//	: "254" + phone.substring(1);
+		const formatPhoneNumber = (phone) => {
+			if (!phone) throw new Error("Phone number is required");
 
-		const timestamp = new Date()
-			.toISOString()
-			.replace(/[-:TZ.]/g, "")
-			.slice(0, 14);
-
-		const password =  Buffer.from(
-			`${MPESA_SHORTCODE}${MPESA_PASSKEY}${timestamp}`
-		).toString("base64");
-
-		const token = await getAccessToken();
-
-		const { data } = await axios.post(
-			"https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
-			{
-				BusinessShortCode: MPESA_SHORTCODE,
-				Password: password,
-				Timestamp: timestamp,
-				TransactionType: "CustomerPayBillOnline",
-				Amount: Math.round(amount),
-				PartyA: `254${phone}`,
-				PartyB: MPESA_SHORTCODE,
-				PhoneNumber: `254${phone}`,
-				CallBackURL: MPESA_CALLBACK_URL,
-				AccountReference: "Leemart",
-				TransactionDesc: "Leemart Order Payment",
-			},
-			{
-				headers: {
-					Authorization: `Bearer ${token}`,
-					"Content-Type": "application/json",	
-				},
+			if (phone.startsWith("0")) {
+				return "254" + phone.slice(1);
 			}
-		);
-		
-		return res.status(200).json({ success: true,message: "STK Push successful", data });
-	} catch (error) {
-		console.error("STK ERROR:", error.response?.data || error.message);
-		res.status(400).json(error.response?.data || error.message);
-	}
-};
 
-// ================= CALLBACK =================
-export const mpesaCallback = async (req, res) => {
-	try {
-		console.log("MPESA CALLBACK:", JSON.stringify(req.body, null, 2));
+			if (phone.startsWith("7") || phone.startsWith("1")) {
+				return "254" + phone;
+			}
 
-		const stkCallback = req.body.Body.stkCallback;
-		const { MerchantRequestID, CheckoutRequestID, ResultCode } = stkCallback;
+			if (phone.startsWith("254")) {
+				return phone;
+			}
 
-		if (ResultCode !== 0) {
-			return res.json({ ResultCode: 0, ResultDesc: "Received" });
+			throw new Error("Invalid phone number format");
+		};
+
+		if (!phone || !amount) {
+			return res.status(400).json({
+				success: false,
+				message: "Phone and amount are required",
+			});
 		}
 
-		const items = stkCallback.CallbackMetadata.Item;
-		const paymentData = {};
 
-		items.forEach(item => {
-			paymentData[item.Name] = item.Value;
+		 const token = req.mpesaToken;
+		 const phoneNumber = formatPhoneNumber(phone);
+
+		const date = new Date()
+			const timestamp = date.getFullYear() +
+			("0" + (date.getMonth() +1)).slice(-2) +
+			("0" + (date.getDate())).slice(-2) +
+			("0" + (date.getHours())).slice(-2) +
+			("0" + (date.getMinutes())).slice(-2) +
+			("0" + (date.getSeconds())).slice(-2) 
+
+			
+		
+		
+			const password = Buffer.from(`${shortcode}${passkey}${timestamp}`
+			).toString("base64");
+		
+		await axios.post("https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
+			{
+			Password: password,
+			BusinessShortCode: shortcode,
+			Timestamp: timestamp,
+			Amount: amount,
+			PartyA: phoneNumber,
+			PartyB: shortcode,
+			TransactionType: "CustomerPayBillOnline",
+			PhoneNumber: phoneNumber,
+			TransactionDesc: "leemart",
+			AccountReference: "leemart e commerce",
+			CallBackURL: callbackUrl
+			},
+			{
+				headers : {Authorization: `Bearer ${token}`}
+			},
+
+		)
+
+		return res.status(200).json({
+			success: true,
+			data: res.data,
+			message: "STK Push Initiated",
 		});
+		
 
-		await Payment.create({
-			merchantRequestId: MerchantRequestID,
-			checkoutRequestId: CheckoutRequestID,
-			amount: paymentData.Amount,
-			receipt: paymentData.MpesaReceiptNumber,
-			phone: paymentData.PhoneNumber,
-			transactionDate: paymentData.TransactionDate,
-			status: "SUCCESS",
-		});
-
-		return res.json({ ResultCode: 0, ResultDesc: "Received" });
 	} catch (error) {
-		console.error("Callback error:", error);
-		return res.json({ ResultCode: 0, ResultDesc: "Received" });
+		console.error("STK ERROR:", error.message);
+		return res.status(400).json({
+			success: false,
+			message: "Failed to initiate STK Push",
+		});
 	}
 };
 
-// ================= GET PAYMENTS =================
-export const getPayments = async (req, res) => {
-    try {
-        const payments = await Payment.find({});
-        res.json(payments);
-    } catch (error) {
-        console.log("Error in getPayments controller", error.message);
-        res.status(500).json({ message: "Server error", error: error.message });
-    }
-};
+
+
+
