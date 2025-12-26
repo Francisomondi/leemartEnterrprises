@@ -4,6 +4,8 @@ import { useProductStore } from "../stores/useProductStore";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
 import { Helmet } from "react-helmet-async";
+import { motion } from "framer-motion";
+
 
 const ProductPage = () => {
 	const { id } = useParams();
@@ -12,27 +14,61 @@ const ProductPage = () => {
 
 	const [phone, setPhone] = useState("");
 	const [loadingMpesa, setLoadingMpesa] = useState(false);
+	const [mpesaMessage, setMpesaMessage] = useState("");
+		
 
 	useEffect(() => {
 		fetchProductById(id);
 	}, [id]);
 
-	const handleBuyNowMpesa = async () => {
-		if (!phone) return toast.error("Enter phone number");
+	const handleMpesaPayment = async () => {
+	if (!phone) {
+		setMpesaMessage(" Enter phone number");
+		return;
+	}
 
-		try {
-			setLoadingMpesa(true);
-			await axios.post("/mpesa/stk-push", {
-				phone,
+	// Normalize phone number
+	let formattedPhone = phone.trim();
+
+	// If user enters 2547XXXXXXXX → convert to 07XXXXXXXX
+	if (formattedPhone.startsWith("254")) {
+		formattedPhone = "0" + formattedPhone.slice(3);
+	}
+
+	// Basic validation
+	if (!/^0(7|1)\d{8}$/.test(formattedPhone)) {
+		setMpesaMessage("Enter a valid Safaricom number");
+		return;
+	}
+
+	setLoadingMpesa(true);
+	setMpesaMessage("");
+
+	try {
+		const res = await axios.post("/mpesa/stk",
+			{
+				phone: formattedPhone,
 				amount: selectedProduct.price,
-			});
-			toast.success("📲 Check your phone");
-		} catch {
-			toast.error("MPESA failed");
-		} finally {
+
+			},
+			 { timeout: 25000 }
+		);
+
+		console.log("MPESA RESPONSE:", res.data);
+		setMpesaMessage("📲 Check your phone to complete payment");
+		
+	} catch (error) {
+			console.error("MPESA ERROR:", error);
+			setMpesaMessage(
+				error.response?.data?.message ||
+				"Failed to send STK push"
+			);
+			}
+			finally {
 			setLoadingMpesa(false);
-		}
-	};
+			}
+
+};
 
 	if (isLoading) return <p className="text-center">Loading...</p>;
 	if (!selectedProduct) return <p>Product not found</p>;
@@ -86,15 +122,30 @@ const ProductPage = () => {
 							className="mt-6 w-full rounded bg-gray-900 px-4 py-2 text-white"
 						/>
 
-						<button
-							onClick={handleBuyNowMpesa}
+						<motion.button
+							type="button"
+							onClick={handleMpesaPayment}
 							disabled={loadingMpesa}
-							className="mt-4 w-full rounded-lg bg-emerald-600 px-5 py-3 text-white hover:bg-emerald-700"
+							whileHover={!loadingMpesa ? { scale: 1.05 } : {}}
+							whileTap={!loadingMpesa ? { scale: 0.95 } : {}}
+
+							className={`mt-4 w-full rounded-lg px-5 py-2.5 font-medium text-white transition
+								${loadingMpesa
+									? "bg-gray-600 cursor-not-allowed"
+									: "bg-emerald-600 hover:bg-emerald-700"}
+							`}
 						>
-							{loadingMpesa
-								? "Processing..."
-								: "Buy Now with MPESA"}
-						</button>
+							{loadingMpesa ? "📲 Waiting for phone prompt..." : "Buy now with M-PESA"}
+							
+						</motion.button>
+
+						{mpesaMessage && (
+							<p className='text-center text-sm text-emerald-400'>
+								{mpesaMessage}
+							</p>
+						)}
+						
+						
 					</div>
 				</div>
 

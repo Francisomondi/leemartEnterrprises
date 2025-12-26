@@ -44,7 +44,7 @@ const ProductCard = ({ product }) => {
 		}
 
 		try {
-			await axios.post("/api/mpesa/stk-push", {
+			await axios.post("/api/mpesa/stk", {
 				phone: user.phone,
 				amount: product.price,
 			});
