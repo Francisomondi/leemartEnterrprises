@@ -49,7 +49,7 @@ function App() {
 			<div className='relative z-50 flex flex-col min-h-screen'>
 				<Navbar />
 			
- <Toaster position="top-right" />
+ 
 				<main className='flex-grow pt-20'>
 					<Routes>
 						<Route path='/' element={<HomePage />} />

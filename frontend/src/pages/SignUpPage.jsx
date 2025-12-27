@@ -8,16 +8,29 @@ const SignUpPage = () => {
 	const [formData, setFormData] = useState({
 		name: "",
 		email: "",
+		phone: "",
 		password: "",
 		confirmPassword: "",
 	});
 
 	const { signup, loading } = useUserStore();
 
-	const handleSubmit = (e) => {
+	const handleSubmit = async (e) => {
 		e.preventDefault();
-		signup(formData);
-	};
+
+		let phone = formData.phone.trim();
+		if (phone.startsWith("0")) {
+			phone = "254" + phone.slice(1);
+		}
+
+		if (!/^254(7|1)\d{8}$/.test(phone)) {
+			toast.error("Enter a valid Safaricom number");
+			return;
+	}
+
+  await signup({ ...formData, phone });
+};
+
 
 	return (
 		<div className='flex flex-col justify-center py-12 sm:px-6 lg:px-8'>
@@ -81,6 +94,24 @@ const SignUpPage = () => {
 								/>
 							</div>
 						</div>
+
+
+						<div>
+							<label className="block text-sm font-medium text-gray-300">
+								Phone Number
+							</label>
+							<input
+								type="tel"
+								required
+								placeholder="07XXXXXXXX"
+								value={formData.phone}
+								onChange={(e) =>
+								setFormData({ ...formData, phone: e.target.value })
+								}
+								className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
+							/>
+						</div>
+
 
 						<div>
 							<label htmlFor='password' className='block text-sm font-medium text-gray-300'>
