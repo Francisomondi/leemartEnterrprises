@@ -1,17 +1,19 @@
 
 import axios from "axios";
 import dotenv from "dotenv";
+import MpesaTransaction from "../models/mpesaTransaction.model.js";
+import Order from "../models/order.model.js";
 
 
 dotenv.config();
 
-			const shortcode = process.env.MPESA_SHORTCODE
-			const passkey = process.env.MPESA_PASSKEY
-			const callbackUrl = process.env.MPESA_CALLBACK_URL
-			const consumerKey = process.env.MPESA_CONSUMER_KEY
-			const consumerSecret = process.env.MPESA_CONSUMER_SECRET
+const shortcode = process.env.MPESA_SHORTCODE
+const passkey = process.env.MPESA_PASSKEY
+const callbackUrl = process.env.MPESA_CALLBACK_URL
+const consumerKey = process.env.MPESA_CONSUMER_KEY
+const consumerSecret = process.env.MPESA_CONSUMER_SECRET
 
-			 const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString("base64");
+	 const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString("base64");
 			 
 
 export const generateToken = async (req, res, next) => {
@@ -126,6 +128,60 @@ export const stkPush = async (req, res) => {
 		});
 	}
 };
+
+export const mpesaCallback = async (req, res) => {
+  try {
+    console.log("MPESA CALLBACK RAW:", JSON.stringify(req.body, null, 2));
+
+    const stkCallback = req.body?.Body?.stkCallback;
+
+    if (!stkCallback) {
+      console.error("Invalid MPESA callback structure");
+      return res.json({ ResultCode: 0, ResultDesc: "Callback received" });
+    }
+
+    const {
+      CheckoutRequestID,
+      ResultCode,
+      ResultDesc,
+      CallbackMetadata,
+    } = stkCallback;
+
+    // ❌ Failed transaction
+    if (ResultCode !== 0) {
+      await MpesaTransaction.create({
+        checkoutRequestId: CheckoutRequestID,
+        status: "FAILED",
+        message: ResultDesc,
+      });
+
+      return res.json({ ResultCode: 0, ResultDesc: "Callback processed" });
+    }
+
+    // ✅ Successful transaction
+    const items = CallbackMetadata?.Item || [];
+
+    const amount = items.find(i => i.Name === "Amount")?.Value;
+    const receipt = items.find(i => i.Name === "MpesaReceiptNumber")?.Value;
+    const phone = items.find(i => i.Name === "PhoneNumber")?.Value;
+    const date = items.find(i => i.Name === "TransactionDate")?.Value;
+
+    await MpesaTransaction.create({
+      amount,
+      phone,
+      mpesaReceipt: receipt,
+      checkoutRequestId: CheckoutRequestID,
+      status: "SUCCESS",
+      transactionDate: date,
+    });
+
+    return res.json({ ResultCode: 0, ResultDesc: "Callback processed" });
+  } catch (error) {
+    console.error("MPESA CALLBACK ERROR:", error);
+    return res.json({ ResultCode: 0, ResultDesc: "Callback received" });
+  }
+};
+
 
 
 

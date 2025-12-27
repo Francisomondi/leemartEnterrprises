@@ -97,8 +97,39 @@ const Navbar = () => {
 						)}
 
 						{user && (
-							<Link to="/profile">Profile</Link>
+							<Link
+								to="/profile"
+								className="
+								flex items-center gap-2 sm:gap-3
+								px-1 sm:px-2 py-1
+								rounded-lg hover:bg-gray-800 transition
+								flex-shrink-0
+								"
+							>
+								<img
+								src={user.avatar || "/default-avatar.png"}
+								alt={user.name || "User avatar"}
+								className="
+									w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11
+									rounded-full object-cover
+									border-2 border-emerald-500
+									hover:ring-2 hover:ring-emerald-400
+									transition
+								"
+								/>
+
+								{/* Hide text on small screens to avoid crowding */}
+								<div className="hidden md:flex flex-col leading-tight max-w-[140px]">
+								<span className="text-sm font-semibold text-white truncate">
+									{user.name}
+								</span>
+								<span className="text-xs text-gray-400">
+									My Profile
+								</span>
+								</div>
+							</Link>
 						)}
+
 					</nav>
 
 					{/* Mobile Menu Button */}
@@ -113,6 +144,39 @@ const Navbar = () => {
 				{/* Mobile Menu */}
 				{open && (
 					<div className='md:hidden mt-4 space-y-3'>
+
+						{user && (
+						<Link
+							to="/profile"
+							onClick={() => setOpen(false)}
+							className="
+							flex items-center gap-4
+							p-3 rounded-lg
+							bg-gray-800 hover:bg-gray-700
+							transition
+							"
+						>
+							<img
+							src={user.avatar || "/default-avatar.png"}
+							alt={user.name || "User avatar"}
+							className="
+								w-12 h-12
+								rounded-full object-cover
+								border-2 border-emerald-500
+							"
+						/>
+
+							<div className="flex flex-col leading-tight">
+							<span className="text-base font-semibold text-white">
+								{user.name}
+							</span>
+							<span className="text-sm text-gray-400">
+								View Profile
+							</span>
+							</div>
+						</Link>
+						)}
+
 						<Link onClick={() => setOpen(false)} to='/' className='block text-gray-300 hover:text-emerald-400'>
 							Home
 						</Link>
