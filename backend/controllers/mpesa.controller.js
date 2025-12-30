@@ -2,7 +2,7 @@
 import axios from "axios";
 import dotenv from "dotenv";
 import MpesaTransaction from "../models/mpesaTransaction.model.js";
-import Order from "../models/order.model.js";
+
 
 
 dotenv.config();
@@ -47,8 +47,7 @@ export const generateToken = async (req, res, next) => {
 // ================= STK PUSH =================
 export const stkPush = async (req, res) => {	
 	try {
-		let phone = req.body.phone
-		let  amount = req.body.amount;
+		 const { phone, amount } = req.body;
 
 		const formatPhoneNumber = (phone) => {
 			if (!phone) throw new Error("Phone number is required");
@@ -93,7 +92,7 @@ export const stkPush = async (req, res) => {
 			const password = Buffer.from(`${shortcode}${passkey}${timestamp}`
 			).toString("base64");
 		
-		await axios.post("https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
+		const response =await axios.post("https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
 			{
 			Password: password,
 			BusinessShortCode: shortcode,
@@ -113,10 +112,21 @@ export const stkPush = async (req, res) => {
 
 		)
 
+   const { MerchantRequestID, CheckoutRequestID } = response.data;
+
+	const mpesaTransaction = await MpesaTransaction.create({
+      merchantRequestID: MerchantRequestID,
+      checkoutRequestID: CheckoutRequestID,
+      phoneNumber,
+      amount,
+      status: "PENDING",
+    });
+
 		return res.status(200).json({
 			success: true,
-			data: res.data,
+			data: mpesaTransaction.data,
 			message: "STK Push Initiated",
+			
 		});
 		
 
@@ -125,56 +135,68 @@ export const stkPush = async (req, res) => {
 		return res.status(400).json({
 			success: false,
 			message: "Failed to initiate STK Push",
+			
 		});
 	}
 };
 
 export const mpesaCallback = async (req, res) => {
   try {
-    console.log("MPESA CALLBACK RAW:", JSON.stringify(req.body, null, 2));
-
     const stkCallback = req.body?.Body?.stkCallback;
-	console.log(stkCallback.CallbackMetadata)
 
     if (!stkCallback) {
-      console.error("Invalid MPESA callback structure");
       return res.json({ ResultCode: 0, ResultDesc: "Callback received" });
     }
 
     const {
+      merchantRequestID,
       CheckoutRequestID,
       ResultCode,
       ResultDesc,
       CallbackMetadata,
     } = stkCallback;
 
-    // ❌ Failed transaction
-    if (ResultCode !== 0) {
-      await MpesaTransaction.create({
-        checkoutRequestId: CheckoutRequestID,
-        status: "FAILED",
-        message: ResultDesc,
-      });
+    const transaction = await MpesaTransaction.findOne({
+      checkoutRequestID: CheckoutRequestID,
+    });
 
+    if (!transaction) {
+      console.error(
+        "Transaction not found for callback:",
+        CheckoutRequestID
+      );
       return res.json({ ResultCode: 0, ResultDesc: "Callback processed" });
     }
 
+     if (ResultCode !== 0) {
+      transaction.status = "FAILED";
+      transaction.resultCode = ResultCode;
+      transaction.resultDesc = ResultDesc;
+      await transaction.save();
+
+      return res.json({ ResultCode: 0, ResultDesc: "Callback processed" });
+
+    }
+  
     // ✅ Successful transaction
-    const items = CallbackMetadata?.Item || [];
+       const items = CallbackMetadata?.Item || [];
 
-    const amount = items.find(i => i.Name === "Amount")?.Value;
-    const receipt = items.find(i => i.Name === "MpesaReceiptNumber")?.Value;
-    const phone = items.find(i => i.Name === "PhoneNumber")?.Value;
-    const date = items.find(i => i.Name === "TransactionDate")?.Value;
+        const amount = items.find(i => i.Name === "Amount")?.Value;
+        const receipt = items.find(i => i.Name === "MpesaReceiptNumber")?.Value;
+        const phone = items.find(i => i.Name === "PhoneNumber")?.Value;
+        const date = items.find(i => i.Name === "TransactionDate")?.Value;
 
-    await MpesaTransaction.create({
-      amount,
-      phone,
-      mpesaReceipt: receipt,
-      checkoutRequestId: CheckoutRequestID,
-      status: "SUCCESS",
-      transactionDate: date,
-    });
+        transaction.amount = amount;
+        transaction.phoneNumber = phone;
+        transaction.mpesaReceiptNumber = receipt;
+        transaction.transactionDate = date;
+        transaction.resultCode = ResultCode;
+        transaction.resultDesc = ResultDesc;
+        transaction.status = "SUCCESS";
+
+
+   
+    await transaction.save();
 
     return res.json({ ResultCode: 0, ResultDesc: "Callback processed" });
   } catch (error) {
@@ -182,6 +204,8 @@ export const mpesaCallback = async (req, res) => {
     return res.json({ ResultCode: 0, ResultDesc: "Callback received" });
   }
 };
+
+
 
 
 

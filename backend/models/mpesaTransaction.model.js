@@ -2,58 +2,25 @@ import mongoose from "mongoose";
 
 const mpesaTransactionSchema = new mongoose.Schema(
   {
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
+    merchantRequestID: { type: String },
+    checkoutRequestID: { type: String, index: true },
 
-    order: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Order",
-      required: true,
-    },
+    phone: { type: String },
+    amount: { type: Number },
 
-    phone: {
-      type: String,
-      required: true,
-    },
+    resultCode: { type: Number },
+    resultDesc: { type: String },
 
-    amount: {
-      type: Number,
-      required: true,
-    },
-
-    mpesaReceiptNumber: {
-      type: String,
-      unique: true,
-      sparse: true,
-    },
-
-    checkoutRequestID: {
-      type: String,
-      required: true,
-    },
-
-    merchantRequestID: {
-      type: String,
-      required: true,
-    },
-
-    resultCode: {
-      type: Number,
-      required: true,
-    },
-
-    resultDesc: {
-      type: String,
-    },
+    mpesaReceiptNumber: { type: String },
+    transactionDate: { type: String },
 
     status: {
       type: String,
-      enum: ["SUCCESS", "FAILED"],
-      required: true,
+      enum: ["PENDING", "SUCCESS", "FAILED"],
+      default: "PENDING",
     },
+
+    rawCallback: { type: Object }, // full callback for debugging
   },
   { timestamps: true }
 );
