@@ -2,10 +2,15 @@ import mongoose from "mongoose";
 
 const mpesaTransactionSchema = new mongoose.Schema(
   {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true, // allow guest payments
+    },
     merchantRequestID: { type: String },
     checkoutRequestID: { type: String, index: true },
 
-    phone: { type: String },
+    phoneNumber: { type: String, required: true },
     amount: { type: Number },
 
     resultCode: { type: Number },

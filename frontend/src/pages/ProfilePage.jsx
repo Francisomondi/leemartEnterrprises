@@ -3,12 +3,17 @@ import { useUserStore } from "../stores/useUserStore";
 import { toast } from "react-hot-toast";
 import { format } from "date-fns";
 import axiosInstance from "../lib/axios";
+import axios from "axios";
+
+
+
+
 
 const ProfilePage = () => {
   const { user, fetchProfile, updateProfile, loading } = useUserStore();
   const [form, setForm] = useState({ name: "", phone: "" });
   const [orders, setOrders] = useState([]);
-  const [mpesaTransactions, setMpesaTransactions] = useState([]);
+  const [transactions, setTransactions] = useState([]);
   const [avatar, setAvatar] = useState(null);
   const [avatarLoading, setAvatarLoading] = useState(false);
 
@@ -22,10 +27,12 @@ const ProfilePage = () => {
         name: user.name ?? "",
         phone: user.phone ?? "",
       });
-      fetchOrders();
-      fetchMpesaTransactions();
+     // fetchOrders();
+      fetchTransactions();
     }
   }, [user]);
+
+  
 
   // Normalize phone for MPESA
   const normalizePhone = (phone) => {
@@ -74,23 +81,25 @@ const ProfilePage = () => {
     }
   };
 
-  const fetchOrders = async () => {
-    try {
-      const res = await axiosInstance.get("/orders/my");
-      setOrders(res.data);
-    } catch {
-      setOrders([]);
-    }
-  };
+  //const fetchOrders = async () => {
+   // try {
+   //   const res = await axiosInstance.get("/orders/my");
+   //   setOrders(res.data);
+   //// } catch {
+   //   setOrders([]);
+   // }
+ // };
 
-  const fetchMpesaTransactions = async () => {
-    try {
-      const res = await axiosInstance.get("/mpesa/transactions");
-      setMpesaTransactions(res.data);
-    } catch {
-      setMpesaTransactions([]);
-    }
-  };
+const fetchTransactions = async () => {
+  try {
+    const res = await axiosInstance.get("/mpesa/my", {
+    withCredentials: true,
+  });
+ setTransactions(res.data.transactions);
+  } catch (error) {
+        console.error("Failed to fetch MPESA transactions:", error);
+      }
+};
 
   if (!user) {
     return (
@@ -210,31 +219,51 @@ const ProfilePage = () => {
 
       {/* Recent MPESA Transactions */}
       <div className="bg-gray-900 shadow rounded-lg p-6 md:p-10">
-        <h2 className="text-xl font-bold text-emerald-400 mb-4">
-          Recent MPESA Transactions
-        </h2>
-        {mpesaTransactions.length === 0 ? (
-          <p className="text-gray-400">No transactions yet.</p>
-        ) : (
-          <div className="space-y-3">
-            {mpesaTransactions.slice(0, 5).map((tx) => (
-              <div
-                key={tx._id}
-                className="bg-gray-800 p-3 rounded flex justify-between items-center"
-              >
-                <span>{tx.transactionType}</span>
-                <span className="text-emerald-400 font-semibold">
-                  KES {tx.amount}
-                </span>
-                <span className="text-gray-400 text-sm">
-                  {format(new Date(tx.date), "PPP p")}
-                </span>
-              </div>
+      <h2 className="text-xl font-bold text-emerald-400 mb-4">My MPESA Payments</h2>
+
+      {transactions?.length === 0 ? (
+        <p className="text-gray-400" >No MPESA transactions found.</p>
+      ) : (
+        <table className="w-full border">
+          <thead>
+            <tr className="bg-gray-900">
+              <th className="p-2">Receipt</th>
+              <th className="p-2">Amount</th>
+              <th className="p-2">Phone</th>
+              <th className="p-2">Status</th>
+              <th className="p-2">Date</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {transactions?.map(tx => (
+              <tr key={tx._id} className="border-t">
+                <td className="p-2">{tx.mpesaReceiptNumber || "—"}</td>
+                <td className="p-2">KES {tx.amount}</td>
+                <td className="p-2">{tx.phoneNumber}</td>
+                <td className="p-2">
+                  <span
+                    className={
+                      tx.status === "SUCCESS"
+                        ? "text-green-600"
+                        : tx.status === "FAILED"
+                        ? "text-red-600"
+                        : "text-yellow-600"
+                    }
+                  >
+                    {tx.status}
+                  </span>
+                </td>
+                <td className="p-2">
+                  {new Date(tx.createdAt).toLocaleString()}
+                </td>
+              </tr>
             ))}
-          </div>
-        )}
-      </div>
+          </tbody>
+        </table>
+      )}
     </div>
+</div>
   );
 };
 

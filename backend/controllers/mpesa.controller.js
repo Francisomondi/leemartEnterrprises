@@ -28,7 +28,7 @@ export const generateToken = async (req, res, next) => {
     );
 
     req.mpesaToken = response.data.access_token; // ✅ attach to req
-	console.log(req.mpesaToken)
+	  console.log(req.mpesaToken)
     next();
 
   } catch (error) {
@@ -115,6 +115,7 @@ export const stkPush = async (req, res) => {
    const { MerchantRequestID, CheckoutRequestID } = response.data;
 
 	const mpesaTransaction = await MpesaTransaction.create({
+      user: req.user?._id,
       merchantRequestID: MerchantRequestID,
       checkoutRequestID: CheckoutRequestID,
       phoneNumber,
@@ -181,13 +182,15 @@ export const mpesaCallback = async (req, res) => {
     // ✅ Successful transaction
        const items = CallbackMetadata?.Item || [];
 
+        ///const user = items.find(i => i.Name === "user._id,")?.Value;
         const amount = items.find(i => i.Name === "Amount")?.Value;
         const receipt = items.find(i => i.Name === "MpesaReceiptNumber")?.Value;
-        const phone = items.find(i => i.Name === "PhoneNumber")?.Value;
+        const phoneNumber = items.find(i => i.Name === "PhoneNumber")?.Value;
         const date = items.find(i => i.Name === "TransactionDate")?.Value;
 
+        ///transaction.user = user;
         transaction.amount = amount;
-        transaction.phoneNumber = phone;
+        transaction.phoneNumber = phoneNumber;
         transaction.mpesaReceiptNumber = receipt;
         transaction.transactionDate = date;
         transaction.resultCode = ResultCode;
@@ -198,6 +201,8 @@ export const mpesaCallback = async (req, res) => {
    
     await transaction.save();
 
+    
+
     return res.json({ ResultCode: 0, ResultDesc: "Callback processed" });
   } catch (error) {
     console.error("MPESA CALLBACK ERROR:", error);
@@ -207,7 +212,40 @@ export const mpesaCallback = async (req, res) => {
 
 
 
+export const getMyMpesaTransactions = async (req, res) => {
+  try {
+    const transactions = await MpesaTransaction.find({
+      user: req.user?._id,
+    }).sort({ createdAt: -1 });
+    
+    res.status(200).json({
+      success: true,
+      transactions,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch MPESA transactions",
+    });
+  }
+};
 
+export const getAllMpesaTransactions = async (req, res) => {
+  try {
+    const transactions = await MpesaTransaction.find()
+      .populate("user", "name email")
+      .sort({ createdAt: -1 });
 
+    res.status(200).json({
+      success: true,
+      data: transactions,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch MPESA transactions",
+    });
+  }
+};
 
 

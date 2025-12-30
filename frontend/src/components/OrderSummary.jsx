@@ -70,7 +70,7 @@ const OrderSummary = () => {
 				amount: total,
 
 			},
-			 { timeout: 25000 }
+			 { timeout: 30000 }
 		);
 
 		console.log("MPESA RESPONSE:", res.data);
