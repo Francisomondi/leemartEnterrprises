@@ -1,5 +1,6 @@
 import express from "express";
 import { generateToken, mpesaCallback, stkPush} from "../controllers/mpesa.controller.js";
+//import { protectRoute } from "../middleware/auth.middleware.js";
 
 
 const router = express.Router();

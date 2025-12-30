@@ -20,8 +20,7 @@ const PORT = process.env.PORT || 5000;
 
 const __dirname = path.resolve();
 
-app.use(express.json()); 
-
+app.use(express.json({ limit: "10mb" })); // allows you to parse the body of the request
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
@@ -43,7 +42,7 @@ app.use(
       }
     },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );

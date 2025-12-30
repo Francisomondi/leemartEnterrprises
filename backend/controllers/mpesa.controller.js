@@ -134,6 +134,7 @@ export const mpesaCallback = async (req, res) => {
     console.log("MPESA CALLBACK RAW:", JSON.stringify(req.body, null, 2));
 
     const stkCallback = req.body?.Body?.stkCallback;
+	console.log(stkCallback.CallbackMetadata)
 
     if (!stkCallback) {
       console.error("Invalid MPESA callback structure");
