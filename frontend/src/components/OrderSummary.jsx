@@ -4,14 +4,18 @@ import { Link } from "react-router-dom";
 import { MoveRight } from "lucide-react";
 import { loadStripe } from "@stripe/stripe-js";
 import axios from "../lib/axios";
-import { useState } from "react";
+import { useState,useEffect } from "react";
+import toast from "react-hot-toast";
+
+import mpesaTransactionModel from "../../../backend/models/mpesaTransaction.model";
+
 
 const stripePromise = loadStripe(
 	"pk_test_51QECS1CuN2A0ZRg3Rd2xBu36onklMc2SDdezYRPo6C4Wuju4UkxQye229izbiYPtwK6t08g7WCaDzV0NZEoTMR1C00Gbcr6sIs"
 );
 
 const OrderSummary = () => {
-	const { total, subtotal, coupon, isCouponApplied, cart } = useCartStore();
+	const { total, subtotal, coupon, isCouponApplied, cart, clearCart } = useCartStore();
 
 	const [phone, setPhone] = useState("");
 	const [loadingMpesa, setLoadingMpesa] = useState(false);
@@ -34,12 +38,26 @@ const OrderSummary = () => {
 		const session = res.data;
 		const result = await stripe.redirectToCheckout({
 			sessionId: session.id,
+			clearCart: true
 		});
 
 		if (result.error) console.error(result.error);
 	};
 
 	// 📲 MPESA
+
+ const SuccessPayment = async () => {
+	if (mpesaTransactionModel.status === "SUCCESS") {
+			await clearCart();
+			toast.success("Order placed successfully",{
+			autoClose: 5000,
+		});
+ 	}
+ 		 
+ }
+  useEffect(() => {
+ 	SuccessPayment()
+ },[]);
 	const handleMpesaPayment = async () => {
 	if (!phone) {
 		setMpesaMessage(" Enter phone number");
@@ -70,11 +88,15 @@ const OrderSummary = () => {
 				amount: total,
 
 			},
-			 { timeout: 30000 }
+			 { timeout: 10000 }
 		);
 
 		console.log("MPESA RESPONSE:", res.data);
 		setMpesaMessage("📲 Check your phone to complete payment");
+
+		SuccessPayment()
+
+
 	} catch (error) {
 			console.error("MPESA ERROR:", error);
 			setMpesaMessage(
@@ -168,6 +190,10 @@ const OrderSummary = () => {
 						{mpesaMessage}
 					</p>
 				)}
+
+				
+
+				
 
 				<div className='flex justify-center gap-2'>
 					<span className='text-gray-400'>or</span>

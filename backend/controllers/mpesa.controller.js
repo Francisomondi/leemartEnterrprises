@@ -5,6 +5,7 @@ import MpesaTransaction from "../models/mpesaTransaction.model.js";
 
 
 
+
 dotenv.config();
 
 const shortcode = process.env.MPESA_SHORTCODE
@@ -39,10 +40,6 @@ export const generateToken = async (req, res, next) => {
     });
   }
 };
-
-
-
-
 
 // ================= STK PUSH =================
 export const stkPush = async (req, res) => {	
@@ -203,6 +200,8 @@ export const mpesaCallback = async (req, res) => {
 
     
 
+    
+
     return res.json({ ResultCode: 0, ResultDesc: "Callback processed" });
   } catch (error) {
     console.error("MPESA CALLBACK ERROR:", error);
@@ -217,7 +216,7 @@ export const getMyMpesaTransactions = async (req, res) => {
     const transactions = await MpesaTransaction.find({
       user: req.user?._id,
     }).sort({ createdAt: -1 });
-    
+
     res.status(200).json({
       success: true,
       transactions,
@@ -238,7 +237,7 @@ export const getAllMpesaTransactions = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: transactions,
+      transactions:transactions || [] ,
     });
   } catch (error) {
     res.status(500).json({
