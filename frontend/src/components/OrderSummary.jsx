@@ -4,11 +4,8 @@ import { Link } from "react-router-dom";
 import { MoveRight } from "lucide-react";
 import { loadStripe } from "@stripe/stripe-js";
 import axios from "../lib/axios";
-import { useState,useEffect } from "react";
 import toast from "react-hot-toast";
-
-import mpesaTransactionModel from "../../../backend/models/mpesaTransaction.model";
-
+import { useEffect, useState } from "react";
 
 const stripePromise = loadStripe(
 	"pk_test_51QECS1CuN2A0ZRg3Rd2xBu36onklMc2SDdezYRPo6C4Wuju4UkxQye229izbiYPtwK6t08g7WCaDzV0NZEoTMR1C00Gbcr6sIs"
@@ -16,13 +13,12 @@ const stripePromise = loadStripe(
 
 const OrderSummary = () => {
 	const { total, subtotal, coupon, isCouponApplied, cart, clearCart } = useCartStore();
-
+	const [transactionId, setTransactionId] = useState(null);
 	const [phone, setPhone] = useState("");
 	const [loadingMpesa, setLoadingMpesa] = useState(false);
 	const [mpesaMessage, setMpesaMessage] = useState("");
 
 	const savings = subtotal - total;
-
 	const formattedSubtotal = subtotal.toLocaleString("en-KE");
 	const formattedTotal = total.toLocaleString("en-KE");
 	const formattedSavings = savings.toLocaleString("en-KE");
@@ -45,19 +41,6 @@ const OrderSummary = () => {
 	};
 
 	// 📲 MPESA
-
- const SuccessPayment = async () => {
-	if (mpesaTransactionModel.status === "SUCCESS") {
-			await clearCart();
-			toast.success("Order placed successfully",{
-			autoClose: 5000,
-		});
- 	}
- 		 
- }
-  useEffect(() => {
- 	SuccessPayment()
- },[]);
 	const handleMpesaPayment = async () => {
 	if (!phone) {
 		setMpesaMessage(" Enter phone number");
@@ -88,13 +71,17 @@ const OrderSummary = () => {
 				amount: total,
 
 			},
-			 { timeout: 10000 }
+			 { timeout: 20000 }
 		);
+		setTransactionId(res.data.checkoutRequestID); 
 
 		console.log("MPESA RESPONSE:", res.data);
 		setMpesaMessage("📲 Check your phone to complete payment");
 
-		SuccessPayment()
+	if (res.data.status === "SUCCESS" || res.data.resultCode === 0) {
+        clearCart();
+        toast.success("Order placed successfully", { duration: 5000 });
+      }
 
 
 	} catch (error) {
@@ -109,7 +96,29 @@ const OrderSummary = () => {
 			}
 
 };
+ useEffect(() => {
+  if (!transactionId) return; // Only run when a transaction is active
 
+  const interval = setInterval(async () => {
+    try {
+      const res = await axios.get(`/mpesa/status/${transactionId}`); 
+      const tx = res.data.transaction;
+
+      if (tx?.status === "SUCCESS") {
+        clearCart(); // clear cart on success
+        toast.success("Order placed successfully!", { duration: 5000 });
+        setTransactionId(null); // stop polling
+      } else if (tx?.status === "FAILED") {
+        toast.error("MPESA payment failed. Please try again.", { duration: 5000 });
+        setTransactionId(null); // stop polling
+      }
+    } catch (error) {
+      console.error("Failed to fetch MPESA status:", error);
+    }
+  }, 5000); // check every 5 seconds
+
+  return () => clearInterval(interval);
+}, [transactionId, clearCart]);
 
 	return (
 		<motion.div
