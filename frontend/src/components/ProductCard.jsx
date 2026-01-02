@@ -32,29 +32,7 @@ const ProductCard = ({ product }) => {
 	};
 
 	/* ================= BUY NOW (MPESA) ================= */
-	const handleBuyNowMpesa = async () => {
-		if (!user) {
-			toast.error("Please login first");
-			return;
-		}
-
-		if (!user.phone) {
-			toast.error("Add phone number to profile");
-			return;
-		}
-
-		try {
-			await axios.post("/mpesa/stk", {
-				phone: user.phone,
-				amount: product.price,
-			});
-
-			toast.success("📲 Check your phone to complete payment");
-		} catch (error) {
-			toast.error("❌ MPESA payment failed");
-		}
-	};
-
+	
 	return (
 		<div className='group relative flex w-full flex-col overflow-hidden rounded-lg border border-gray-700 bg-gray-800 shadow-lg transition-transform duration-300 hover:-translate-y-1 hover:shadow-emerald-500/20'>
 			
@@ -109,15 +87,6 @@ const ProductCard = ({ product }) => {
 					>
 						<ShoppingCart size={20} className='mr-2' />
 						{isInCart ? "In Cart" : "Add to Cart"}
-					</button>
-
-					<button
-						onClick={handleBuyNowMpesa}
-						disabled={!inStock}
-						className='flex w-full items-center justify-center rounded-lg bg-green-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-green-700'
-					>
-						<Zap size={18} className='mr-2' />
-						Buy Now (M-PESA)
 					</button>
 				</div>
 			</div>

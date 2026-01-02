@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useProductStore } from "../stores/useProductStore";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
@@ -151,12 +151,13 @@ const ProductPage = () => {
 
 				{/* RELATED PRODUCTS */}
 				{relatedProducts.length > 0 && (
-					<div className="mt-20">
+			<div className="mt-20">
 						<h2 className="text-2xl font-bold mb-6">
 							Related Products
 						</h2>
-
-						<div className="grid sm:grid-cols-2 md:grid-cols-4 gap-6">
+				<Link to={`/category/${selectedProduct.category}`} 
+					className="text-sm text-gray-400 hover:text-gray-300 transition">
+					<div className="grid sm:grid-cols-2 md:grid-cols-4 gap-6">
 							{relatedProducts.map((product) => (
 								<div
 									key={product._id}
@@ -174,9 +175,11 @@ const ProductPage = () => {
 									</p>
 								</div>
 							))}
-						</div>
 					</div>
-				)}
+				</Link>
+						
+			</div>
+			)}
 			</div>
 		</>
 	);
