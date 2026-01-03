@@ -5,6 +5,7 @@ import axios from "../lib/axios";
 import { Helmet } from "react-helmet-async";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
+import { useCartStore } from "../stores/useCartStore";
 
 const ProductPage = () => {
   const { id } = useParams();
@@ -15,6 +16,7 @@ const ProductPage = () => {
   const [phone, setPhone] = useState("");
   const [loadingMpesa, setLoadingMpesa] = useState(false);
   const [mpesaMessage, setMpesaMessage] = useState("");
+  const { addToCart } = useCartStore();
 
   useEffect(() => {
     fetchProductById(id);
@@ -187,14 +189,21 @@ const ProductPage = () => {
                   className="rounded-lg border border-gray-700 p-4 hover:scale-105 transition"
                 >
                   <img
-						src={product.images?.[0] || product.image}
-						className="h-40 w-full object-cover rounded"
-					/>
+                    src={product.images?.[0] || product.image}
+                    className="h-40 w-full object-cover rounded"
+                  />
                   <p className="mt-2 font-semibold">{product.name}</p>
                   <p className="text-emerald-400">
                     KES {product.price.toLocaleString("en-KE")}
                   </p>
+                       <button
+                        onClick={() => addToCart(product)}
+                        className="mt-3 w-full rounded bg-emerald-600 py-2 text-sm font-medium hover:bg-emerald-700"
+                        >
+                        Add to Cart
+                      </button>
                 </Link>
+                
               ))}
             </div>
           </div>
