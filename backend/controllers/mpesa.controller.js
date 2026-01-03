@@ -4,8 +4,6 @@ import dotenv from "dotenv";
 import MpesaTransaction from "../models/mpesaTransaction.model.js";
 
 
-
-
 dotenv.config();
 
 const shortcode = process.env.MPESA_SHORTCODE
@@ -42,101 +40,99 @@ export const generateToken = async (req, res, next) => {
 };
 
 // ================= STK PUSH =================
-export const stkPush = async (req, res) => {	
-	try {
-		 const { phone, amount } = req.body;
+export const stkPush = async (req, res) => {
+  try {
+    const { phone, amount } = req.body;
 
-		const formatPhoneNumber = (phone) => {
-			if (!phone) throw new Error("Phone number is required");
+    if (!phone || !amount) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone and amount are required",
+      });
+    }
 
-			if (phone.startsWith("0")) {
-				return "254" + phone.slice(1);
-			}
+    const safeAmount = Number(amount);
+    if (isNaN(safeAmount) || safeAmount < 1) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid amount",
+      });
+    }
 
-			if (phone.startsWith("7") || phone.startsWith("1")) {
-				return "254" + phone;
-			}
+    const formatPhoneNumber = (phone) => {
+      if (phone.startsWith("0")) return "254" + phone.slice(1);
+      if (phone.startsWith("7") || phone.startsWith("1")) return "254" + phone;
+      if (phone.startsWith("254")) return phone;
+      throw new Error("Invalid phone number format");
+    };
 
-			if (phone.startsWith("254")) {
-				return phone;
-			}
+    const phoneNumber = formatPhoneNumber(phone);
+    const token = req.mpesaToken;
 
-			throw new Error("Invalid phone number format");
-		};
+    if (!token) {
+      return res.status(500).json({
+        success: false,
+        message: "MPESA token missing",
+      });
+    }
 
-		if (!phone || !amount) {
-			return res.status(400).json({
-				success: false,
-				message: "Phone and amount are required",
-			});
-		}
+    const timestamp =
+      new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 14);
 
+    const password = Buffer.from(
+      `${shortcode}${passkey}${timestamp}`
+    ).toString("base64");
 
-		 const token = req.mpesaToken;
-		 const phoneNumber = formatPhoneNumber(phone);
+    const response = await axios.post(
+      "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
+      {
+        BusinessShortCode: shortcode,
+        Password: password,
+        Timestamp: timestamp,
+        TransactionType: "CustomerPayBillOnline",
+        Amount: safeAmount,
+        PartyA: phoneNumber,
+        PartyB: shortcode,
+        PhoneNumber: phoneNumber,
+        CallBackURL: callbackUrl,
+        AccountReference: "leemart",
+        TransactionDesc: "Leemart Checkout",
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
-		const date = new Date()
-			const timestamp = date.getFullYear() +
-			("0" + (date.getMonth() +1)).slice(-2) +
-			("0" + (date.getDate())).slice(-2) +
-			("0" + (date.getHours())).slice(-2) +
-			("0" + (date.getMinutes())).slice(-2) +
-			("0" + (date.getSeconds())).slice(-2) 
+    const { MerchantRequestID, CheckoutRequestID } = response.data;
 
-			
-		
-		
-			const password = Buffer.from(`${shortcode}${passkey}${timestamp}`
-			).toString("base64");
-		
-		const response =await axios.post("https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
-			{
-			Password: password,
-			BusinessShortCode: shortcode,
-			Timestamp: timestamp,
-			Amount: amount,
-			PartyA: phoneNumber,
-			PartyB: shortcode,
-			TransactionType: "CustomerPayBillOnline",
-			PhoneNumber: phoneNumber,
-			TransactionDesc: "leemart",
-			AccountReference: "leemart e commerce",
-			CallBackURL: callbackUrl
-			},
-			{
-				headers : {Authorization: `Bearer ${token}`}
-			},
-
-		)
-
-   const { MerchantRequestID, CheckoutRequestID } = response.data;
-
-	const mpesaTransaction = await MpesaTransaction.create({
+    const mpesaTransaction = await MpesaTransaction.create({
       user: req.user?._id,
       merchantRequestID: MerchantRequestID,
       checkoutRequestID: CheckoutRequestID,
       phoneNumber,
-      amount,
+      amount: safeAmount,
       status: "PENDING",
     });
 
-		return res.status(200).json({
-			success: true,
-			data: mpesaTransaction.data,
-			message: "STK Push Initiated",
-			
-		});
-		
+    return res.status(200).json({
+      success: true,
+      message: "STK Push Initiated",
+      data: mpesaTransaction,
+    });
+  } catch (error) {
+    console.error("STK ERROR FULL:", error?.response?.data || error.message);
 
-	} catch (error) {
-		console.error("STK ERROR:", error.message);
-		return res.status(400).json({
-			success: false,
-			message: "Failed to initiate STK Push",
-			
-		});
-	}
+    return res.status(400).json({
+      success: false,
+      message: error?.response?.data?.errorMessage || "STK Push failed",
+      error: error?.response?.data || error.message,
+    });
+  }
 };
+
 
 export const mpesaCallback = async (req, res) => {
   try {
@@ -193,23 +189,14 @@ export const mpesaCallback = async (req, res) => {
         transaction.resultCode = ResultCode;
         transaction.resultDesc = ResultDesc;
         transaction.status = "SUCCESS";
-
-
    
     await transaction.save();
-
-    
-
-    
-
     return res.json({ ResultCode: 0, ResultDesc: "Callback processed" });
   } catch (error) {
     console.error("MPESA CALLBACK ERROR:", error);
     return res.json({ ResultCode: 0, ResultDesc: "Callback received" });
   }
 };
-
-
 
 export const getMyMpesaTransactions = async (req, res) => {
   try {

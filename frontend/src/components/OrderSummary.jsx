@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { MoveRight } from "lucide-react";
 import { loadStripe } from "@stripe/stripe-js";
 import axios from "../lib/axios";
-import { toast } from "react-hot-toast";
+import toast from "react-hot-toast";
 import { useEffect, useState } from "react";
 
 const stripePromise = loadStripe(
@@ -74,6 +74,7 @@ const OrderSummary = () => {
       );
     } finally {
       setLoadingMpesa(false);
+	  
     }
   };
 

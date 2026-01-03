@@ -1,6 +1,8 @@
 import { redis } from "../lib/redis.js";
-import cloudinary from "../lib/cloudinary.js";
+import { v2 as cloudinary } from "cloudinary";
 import Product from "../models/product.model.js";
+import imageQueue from "../queues/imageQueue.js";
+
 
 export const getAllProducts = async (req, res) => {
 	try {
@@ -39,30 +41,52 @@ export const getFeaturedProducts = async (req, res) => {
 	}
 };
 
+
 export const createProduct = async (req, res) => {
-	try {
-		const { name, description, price, image, category } = req.body;
+  try {
+    const { name, description, price, category } = req.body;
 
-		let cloudinaryResponse = null;
+    // 1️⃣ Validate images
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ message: "At least one image is required" });
+    }
 
-		if (image) {
-			cloudinaryResponse = await cloudinary.uploader.upload(image, { folder: "products" });
-		}
+    // 2️⃣ Upload images to Cloudinary (CORRECT WAY)
+    const uploadToCloudinary = (fileBuffer) => {
+      return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: "products" },
+          (error, result) => {
+            if (error) return reject(error);
+            resolve(result);
+          }
+        );
+        stream.end(fileBuffer);
+      });
+    };
 
-		const product = await Product.create({
-			name,
-			description,
-			price,
-			image: cloudinaryResponse?.secure_url ? cloudinaryResponse.secure_url : "",
-			category,
-		});
+    const uploadResults = await Promise.all(
+      req.files.map((file) => uploadToCloudinary(file.buffer))
+    );
 
-		res.status(201).json(product);
-	} catch (error) {
-		console.log("Error in createProduct controller", error.message);
-		res.status(500).json({ message: "Server error", error: error.message });
-	}
+    const imageUrls = uploadResults.map((file) => file.secure_url);
+
+    // 3️⃣ Save product
+    const product = await Product.create({
+      name,
+      description,
+      price,
+      category,
+      images: imageUrls,
+    });
+
+    res.status(201).json(product);
+  } catch (error) {
+    console.error("Error in createProduct controller:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 };
+
 
 export const deleteProduct = async (req, res) => {
 	try {
@@ -102,7 +126,7 @@ export const getRecommendedProducts = async (req, res) => {
 					_id: 1,
 					name: 1,
 					description: 1,
-					image: 1,
+					images: 1,
 					price: 1,
 				},
 			},
