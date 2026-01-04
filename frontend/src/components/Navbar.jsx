@@ -26,9 +26,9 @@ const Navbar = () => {
 					{/* Logo */}
 					<Link
 						to='/'
-						className='text-2xl font-bold text-emerald-400 flex items-center'
+						className='text-2xl font-bold text-emerald-900 flex items-center'
 					>
-						<img src='/logo.png' alt='Logo' className="h-8 md:h-10 w-auto object-contain"/>
+						<img src='/logo.png' alt='Leemart Logo' className="h-12 md:h-16 w-auto object-contain"/>
 					</Link>
 
 					{/* Desktop Nav */}
