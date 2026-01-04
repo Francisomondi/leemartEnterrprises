@@ -3,6 +3,7 @@ import { generateToken, mpesaCallback, stkPush} from "../controllers/mpesa.contr
 import {
   getMyMpesaTransactions,
   getAllMpesaTransactions,
+  getMpesaStatus
 } from "../controllers/mpesa.controller.js";
 
 import { protectRoute, adminRoute } from "../middleware/auth.middleware.js";
@@ -16,6 +17,7 @@ router.post("/callback", mpesaCallback);
 router.get("/my", protectRoute, getMyMpesaTransactions);
 
 router.get("/all", protectRoute, adminRoute, getAllMpesaTransactions);
+router.get("/status/:checkoutRequestID", getMpesaStatus);
 
 
 

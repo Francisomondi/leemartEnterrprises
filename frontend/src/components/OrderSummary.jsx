@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useCartStore } from "../stores/useCartStore";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { MoveRight } from "lucide-react";
 import { loadStripe } from "@stripe/stripe-js";
 import axios from "../lib/axios";
@@ -19,6 +19,8 @@ const OrderSummary = () => {
   const [phone, setPhone] = useState("");
   const [loadingMpesa, setLoadingMpesa] = useState(false);
   const [mpesaMessage, setMpesaMessage] = useState("");
+  const navigate = useNavigate();
+  
 
   const savings = subtotal - total;
 
@@ -68,6 +70,11 @@ const OrderSummary = () => {
 
       setTransactionId(res.data.checkoutRequestID);
       setMpesaMessage("📲 Check your phone to complete payment");
+      toast.success("📲 Check your phone");
+      
+      const checkoutRequestID = res.data.checkoutRequestID;
+      pollPaymentStatus(checkoutRequestID);
+
     } catch (error) {
       setMpesaMessage(
         error.response?.data?.message || "Failed to send STK push"
@@ -79,31 +86,33 @@ const OrderSummary = () => {
   };
 
   // -------- POLL MPESA STATUS --------
-  useEffect(() => {
-    if (!transactionId) return;
+ const pollPaymentStatus = (checkoutRequestID) => {
+  const interval = setInterval(async () => {
+    try {
+      const res = await axios.get(
+        `/mpesa/status/${checkoutRequestID}`
+      );
 
-    const interval = setInterval(async () => {
-      try {
-        const res = await axios.get(`/mpesa/status/${transactionId}`);
-        const tx = res.data.transaction;
+      if (res.data.status === "SUCCESS") {
+        clearInterval(interval);
 
-        if (tx?.status === "SUCCESS") {
-          clearCart();
-          toast.success("🎉 Payment successful! Order placed.");
-          setTransactionId(null);
-        }
+        toast.success("✅ Payment successful!");
+        clearCart();
 
-        if (tx?.status === "FAILED") {
-          toast.error("MPESA payment failed");
-          setTransactionId(null);
-        }
-      } catch (err) {
-        console.error("MPESA polling error:", err);
+        setTimeout(() => {
+          navigate("/");
+        }, 1500);
       }
-    }, 5000);
 
-    return () => clearInterval(interval);
-  }, [transactionId, clearCart]);
+      if (res.data.status === "FAILED") {
+        clearInterval(interval);
+        toast.error("❌ Payment failed");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }, 3000); // every 3 seconds
+};
 
   // ---------------- UI ----------------
   return (

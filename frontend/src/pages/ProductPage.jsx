@@ -6,6 +6,7 @@ import { Helmet } from "react-helmet-async";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
 import { useCartStore } from "../stores/useCartStore";
+import { useNavigate } from 'react-router-dom';
 
 const ProductPage = () => {
   const { id } = useParams();
@@ -17,6 +18,9 @@ const ProductPage = () => {
   const [loadingMpesa, setLoadingMpesa] = useState(false);
   const [mpesaMessage, setMpesaMessage] = useState("");
   const { addToCart } = useCartStore();
+  const { clearCart } = useCartStore();
+  const navigate = useNavigate();
+
 
   useEffect(() => {
     fetchProductById(id);
@@ -24,6 +28,7 @@ const ProductPage = () => {
 
   /* ================= MPESA ================= */
  const handleMpesaPayment = async () => {
+
 	if (!phone) {
 		setMpesaMessage(" Enter phone number");
 		return;
@@ -55,6 +60,10 @@ const ProductPage = () => {
 
 		console.log("MPESA RESPONSE:", res.data);
 		setMpesaMessage("📲 Check your phone to complete payment");
+     toast.success("📲 Check your phone");
+
+     const checkoutRequestID = res.data.checkoutRequestID;
+      pollPaymentStatus(checkoutRequestID);
 		
 	} catch (error) {
 			console.error("MPESA ERROR:", error);
@@ -62,12 +71,41 @@ const ProductPage = () => {
 				error.response?.data?.message ||
 				"Failed to send STK push"
 			);
+      toast.error("Failed to initiate payment");
 			}
 			finally {
 			setLoadingMpesa(false);
 			}
 
 };
+const pollPaymentStatus = (checkoutRequestID) => {
+  const interval = setInterval(async () => {
+    try {
+      const res = await axios.get(
+        `/mpesa/status/${checkoutRequestID}`
+      );
+
+      if (res.data.status === "SUCCESS") {
+        clearInterval(interval);
+
+        toast.success("✅ Payment successful!");
+        clearCart();
+
+        setTimeout(() => {
+          navigate("/");
+        }, 1500);
+      }
+
+      if (res.data.status === "FAILED") {
+        clearInterval(interval);
+        toast.error("❌ Payment failed");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }, 3000); // every 3 seconds
+};
+
 
   if (isLoading) {
     return <p className="text-center py-20 text-gray-300">Loading...</p>;

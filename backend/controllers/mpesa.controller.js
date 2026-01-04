@@ -118,6 +118,7 @@ export const stkPush = async (req, res) => {
     });
 
     return res.status(200).json({
+      checkoutRequestID: CheckoutRequestID,
       success: true,
       message: "STK Push Initiated",
       data: mpesaTransaction,
@@ -232,6 +233,22 @@ export const getAllMpesaTransactions = async (req, res) => {
       message: "Failed to fetch MPESA transactions",
     });
   }
+};
+
+// GET /api/mpesa/status/:checkoutRequestID
+export const getMpesaStatus = async (req, res) => {
+  const { checkoutRequestID } = req.params;
+
+  const transaction = await MpesaTransaction.findOne({ checkoutRequestID });
+
+  if (!transaction) {
+    return res.status(404).json({ success: false });
+  }
+
+  res.json({
+    success: true,
+    status: transaction.status,
+  });
 };
 
 

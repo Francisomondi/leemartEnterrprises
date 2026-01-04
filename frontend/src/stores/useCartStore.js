@@ -46,7 +46,7 @@ export const useCartStore = create((set, get) => ({
 
 	clearCart: async () => {
 		try {
-		set({ cart: { items: [] } }); // optimistic UI update
+		set({ cart: [ ] }); // optimistic UI update
 		await get().getCartItems();       // sync with backend
 		} catch (err) {
 		console.error("Failed to clear cart:", err);
