@@ -149,7 +149,12 @@ const ProductPage = () => {
               onChange={(e) => setPhone(e.target.value)}
               className="mt-6 w-full rounded bg-gray-900 px-4 py-2 text-white"
             />
-
+            <button
+                        onClick={() => addToCart(selectedProduct)}
+                        className="mt-3 w-full rounded bg-emerald-600 py-2 text-sm font-medium hover:bg-emerald-700"
+                        >
+                        Add to Cart
+            </button>
             <motion.button
               type="button"
               onClick={handleMpesaPayment}
