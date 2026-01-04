@@ -28,10 +28,11 @@ const ProductPage = () => {
 		setMpesaMessage(" Enter phone number");
 		return;
 	}
-		let formattedPhone = phone.trim();
-		if (formattedPhone.startsWith("0")) {
-		formattedPhone = "254" + formattedPhone.slice(1);
-		}
+	
+    let formattedPhone = phone.trim();
+    if (formattedPhone.startsWith("254")) {
+      formattedPhone = "0" + formattedPhone.slice(3);
+    }
 
 	// Basic validation
 	if (!/^0(7|1)\d{8}$/.test(formattedPhone)) {
@@ -46,7 +47,7 @@ const ProductPage = () => {
 		const res = await axios.post("/mpesa/stk",
 			{
 				phone: formattedPhone,
-				amount: SVGAnimatedNumber(selectedProduct.price),
+				amount: Number(selectedProduct.price),
 
 			},
 			 { timeout: 25000 }

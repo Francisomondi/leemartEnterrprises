@@ -16,6 +16,8 @@ const CreateProductForm = () => {
   });
 
   const { createProduct, loading } = useProductStore();
+  const [images, setImages] = useState([]);
+const [imagePreviews, setImagePreviews] = useState([]);
 
  const handleSubmit = async (e) => {
   e.preventDefault();
@@ -45,10 +47,16 @@ const CreateProductForm = () => {
 };
 
 
- const handleImageChange = (e) => {
+const handleImageChange = (e) => {
   const files = Array.from(e.target.files);
-  setNewProduct({ ...newProduct, images: files });
+
+  setImages(files);
+
+  // create preview URLs
+  const previews = files.map((file) => URL.createObjectURL(file));
+  setImagePreviews(previews);
 };
+
   return (
     <motion.div
       className='bg-gray-800 shadow-lg rounded-lg p-8 mb-8 max-w-xl mx-auto'
@@ -117,26 +125,19 @@ const CreateProductForm = () => {
         </div>
 
         {/* Images */}
-        <div>
-          <input
-            type='file'
-            multiple
-            id='images'
-            className='sr-only'
-            accept='image/*'
-            onChange={handleImageChange}
-          />
-          <label
-            htmlFor='images'
-            className='cursor-pointer bg-gray-700 py-2 px-3 rounded-md shadow-sm text-sm font-medium text-gray-300 hover:bg-gray-600 flex items-center'
-          >
-            <Upload className='h-5 w-5 mr-2' />
-            Upload Images
-          </label>
-          {newProduct.images.length > 0 && (
-            <p className='mt-2 text-sm text-gray-400'>{newProduct.images.length} image(s) selected</p>
-          )}
+     {imagePreviews.length > 0 && (
+        <div className="mt-4 grid grid-cols-3 gap-3">
+          {imagePreviews.map((img, idx) => (
+            <div key={idx} className="relative">
+              <img
+                src={img}
+                alt="preview"
+                className="h-32 w-full rounded object-cover border"
+              />
+            </div>
+          ))}
         </div>
+    )}
 
         {/* Submit */}
         <button
