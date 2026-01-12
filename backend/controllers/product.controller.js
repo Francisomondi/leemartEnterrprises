@@ -87,6 +87,39 @@ export const createProduct = async (req, res) => {
   }
 };
 
+// controllers/product.controller.js
+export const updateProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, price, category } = req.body;
+
+    const updateData = { name, description, price, category };
+
+    // if images are sent (optional)
+    if (req.body.images?.length) {
+      updateData.images = req.body.images;
+    }
+	Object.keys(updateData).forEach(
+  	(key) => updateData[key] === undefined && delete updateData[key]
+	);
+
+    const product = await Product.findByIdAndUpdate(
+      id,
+      updateData,
+       { new: true, runValidators: true }
+    );
+
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    res.json(product);
+  } catch (error) {
+    console.error("Update product error:", error.message);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 
 export const deleteProduct = async (req, res) => {
 	try {

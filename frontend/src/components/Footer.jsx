@@ -80,16 +80,16 @@ const Footer = () => {
 				<div>
 					<h3 className="text-lg font-semibold text-white mb-3">
 						Connect With Us
-					</h3>
+					</h3>x``
 
 					<div className="flex items-center gap-4 mb-4">
-						<a href="https://facebook.com" target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="text-gray-400 hover:text-emerald-400 transition-colors duration-200">
+						<a href="https://web.facebook.com/leemartInvestments" target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="text-gray-400 hover:text-emerald-400 transition-colors duration-200">
 							<Facebook size={20} />
 						</a>
-						<a href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="text-gray-400 hover:text-emerald-400 transition-colors duration-200">
+						<a href="https://www.instagram.com/leemartent/" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="text-gray-400 hover:text-emerald-400 transition-colors duration-200">
 							<Instagram size={20} />
 						</a>
-						<a href="https://twitter.com" target="_blank" rel="noopener noreferrer" aria-label="Twitter" className="text-gray-400 hover:text-emerald-400 transition-colors duration-200">
+						<a href="https://x.com/LeemartEnt" target="_blank" rel="noopener noreferrer" aria-label="Twitter" className="text-gray-400 hover:text-emerald-400 transition-colors duration-200">
 							<Twitter size={20} />
 						</a>
 						<a href="https://wa.me/254715536285" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" className="text-gray-400 hover:text-emerald-400 transition-colors duration-200">

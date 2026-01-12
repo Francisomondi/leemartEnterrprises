@@ -10,16 +10,35 @@ export const useProductStore = create((set) => ({
 
 	setProducts: (products) => set({ products }),
 	createProduct: async (formData) => {
-  set({ loading: true });
-  try {
-    const res = await axios.post("/products",
-      formData
-    );
-    set((state) => ({ products: [res.data, ...state.products] }));
-  } finally {
-    set({ loading: false });
-  }
-},
+		set({ loading: true });
+		try {
+			const res = await axios.post("/products",
+			formData
+			);
+			set((state) => ({ products: [res.data, ...state.products] }));
+		} finally {
+			set({ loading: false });
+		}
+	},
+    updateProduct: async (id, data) => {
+		set({ loading: true });
+		try {
+			const res = await axios.patch(`/products/${id}`, data);
+
+			set((state) => ({
+			products: state.products.map((p) =>
+				p._id === id ? res.data : p
+			),
+			loading: false,
+			}));
+			return res.data
+		} catch (err) {
+			set({ loading: false });
+			throw err;
+		}
+	},
+
+
 	fetchAllProducts: async () => {
 		set({ loading: true });
 		try {
