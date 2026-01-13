@@ -27,6 +27,7 @@ app.use(cookieParser());
 const allowedOrigins = [
   "http://localhost:5173",
   "https://leemartenterrprises.onrender.com",
+  "https://www.leemart.co.ke/"
 ];
 
 app.use(
