@@ -80,7 +80,7 @@ const Footer = () => {
 				<div>
 					<h3 className="text-lg font-semibold text-white mb-3">
 						Connect With Us
-					</h3>x``
+					</h3>
 
 					<div className="flex items-center gap-4 mb-4">
 						<a href="https://web.facebook.com/leemartInvestments" target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="text-gray-400 hover:text-emerald-400 transition-colors duration-200">
