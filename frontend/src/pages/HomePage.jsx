@@ -5,7 +5,7 @@ import FeaturedProducts from "../components/FeaturedProducts";
 
 
 const categories = [
-  { href: "/jeans", name: "Pants", imageUrl: "/jeans.jpg" },
+  { href: "/pants", name: "Pants", imageUrl: "/jeans.jpg" },
   { href: "/t-shirts", name: "Shirts", imageUrl: "/tshirts.jpg" },
   { href: "/shoes", name: "Shoes", imageUrl: "/shoes.jpg" },
   { href: "/sandals", name: "Sandals", imageUrl: "/glasses.png" },

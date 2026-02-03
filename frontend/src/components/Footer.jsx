@@ -28,7 +28,7 @@ const Footer = () => {
 							<MapPin size={16} /> Nairobi, Kenya
 						</p>
 						<p className="flex items-center gap-2">
-							<Phone size={16} /> +254 715536285
+							<Phone size={16} /> +254 119712745
 						</p>
 					</div>
 				</div>
@@ -92,7 +92,7 @@ const Footer = () => {
 						<a href="https://x.com/LeemartEnt" target="_blank" rel="noopener noreferrer" aria-label="Twitter" className="text-gray-400 hover:text-emerald-400 transition-colors duration-200">
 							<Twitter size={20} />
 						</a>
-						<a href="https://wa.me/254715536285" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" className="text-gray-400 hover:text-emerald-400 transition-colors duration-200">
+						<a href="https://wa.me/254119712745" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" className="text-gray-400 hover:text-emerald-400 transition-colors duration-200">
 							<MessageCircle size={20} />
 						</a>
 					</div>
