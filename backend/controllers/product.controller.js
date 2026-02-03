@@ -1,7 +1,7 @@
 import { redis } from "../lib/redis.js";
-import { v2 as cloudinary } from "cloudinary";
+import cloudinary from "../lib/cloudinary.js";
 import Product from "../models/product.model.js";
-import imageQueue from "../queues/imageQueue.js";
+
 
 
 export const getAllProducts = async (req, res) => {
@@ -40,7 +40,6 @@ export const getFeaturedProducts = async (req, res) => {
 		res.status(500).json({ message: "Server error", error: error.message });
 	}
 };
-
 
 export const createProduct = async (req, res) => {
   try {
@@ -87,7 +86,7 @@ export const createProduct = async (req, res) => {
   }
 };
 
-// controllers/product.controller.js
+
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
@@ -129,8 +128,8 @@ export const deleteProduct = async (req, res) => {
 			return res.status(404).json({ message: "Product not found" });
 		}
 
-		if (product.image) {
-			const publicId = product.image.split("/").pop().split(".")[0];
+		if (product.images) {
+			const publicId = product.images.split("/").pop().split(".")[0];
 			try {
 				await cloudinary.uploader.destroy(`products/${publicId}`);
 				console.log("deleted image from cloduinary");
@@ -175,7 +174,7 @@ export const getRecommendedProducts = async (req, res) => {
 export const getProductsByCategory = async (req, res) => {
 	const { category } = req.params;
 	try {
-		const products = await Product.find({ category });
+		const products = await Product.find({ category: req.params.category.toLowerCase() });
 		res.json({ products });
 	} catch (error) {
 		console.log("Error in getProductsByCategory controller", error.message);

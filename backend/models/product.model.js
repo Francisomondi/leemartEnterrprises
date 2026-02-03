@@ -19,11 +19,15 @@ const productSchema = new mongoose.Schema(
 			type: [String],
 			default: [],
 			
-  },// store multiple image URLs
+ 		 },// store multiple image URLs
 		category: {
 			type: String,
 			required: true,
-		},
+			lowercase: true,
+			trim: true,
+		}
+,
+		
 		isFeatured: {
 			type: Boolean,
 			default: false,
