@@ -4,7 +4,8 @@ import { PlusCircle, Upload, Loader } from "lucide-react";
 import { useProductStore } from "../stores/useProductStore";
 import { toast } from "react-hot-toast";
 
-const categories = ["jeans", "t-shirts", "shoes", "glasses", "jackets", "suits", "bags"];
+const categories = ["Pants", "t-shirts", "shoes", "sandals", "jackets", "suits", "bags","dresses","two-piece","Woodies","Shorts","Hats"];
+
 
 const CreateProductForm = () => {
   const [newProduct, setNewProduct] = useState({
