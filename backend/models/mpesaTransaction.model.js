@@ -7,6 +7,8 @@ const mpesaTransactionSchema = new mongoose.Schema(
       ref: "User",
       required: true, // allow guest payments
     },
+    orderId: { type: mongoose.Schema.Types.ObjectId, ref: "MpesaOrder" },
+
     merchantRequestID: { type: String },
     checkoutRequestID: { type: String, index: true },
 

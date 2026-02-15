@@ -2,6 +2,7 @@
 import axios from "axios";
 import dotenv from "dotenv";
 import MpesaTransaction from "../models/mpesaTransaction.model.js";
+import MpesaOrder from "../models/mpesaOrder.model.js";
 
 
 dotenv.config();
@@ -42,9 +43,9 @@ export const generateToken = async (req, res, next) => {
 // ================= STK PUSH =================
 export const stkPush = async (req, res) => {
   try {
-    const { phone, amount } = req.body;
+    const { phone, amount, orderId } = req.body;
 
-    if (!phone || !amount) {
+    if (!phone || !amount || !orderId) {
       return res.status(400).json({
         success: false,
         message: "Phone and amount are required",
@@ -95,7 +96,7 @@ export const stkPush = async (req, res) => {
         PartyB: shortcode,
         PhoneNumber: phoneNumber,
         CallBackURL: callbackUrl,
-        AccountReference: "leemart",
+        AccountReference: orderId, // 
         TransactionDesc: "Leemart Checkout",
       },
       {
@@ -110,6 +111,7 @@ export const stkPush = async (req, res) => {
 
     const mpesaTransaction = await MpesaTransaction.create({
       user: req.user?._id,
+      orderId, // ✅ VERY IMPORTANT
       merchantRequestID: MerchantRequestID,
       checkoutRequestID: CheckoutRequestID,
       phoneNumber,
@@ -163,6 +165,11 @@ export const mpesaCallback = async (req, res) => {
       return res.json({ ResultCode: 0, ResultDesc: "Callback processed" });
     }
 
+     // Prevent double processing
+    if (transaction.status === "SUCCESS") {
+      return res.json({ ResultCode: 0, ResultDesc: "Already processed" });
+    }
+
      if (ResultCode !== 0) {
       transaction.status = "FAILED";
       transaction.resultCode = ResultCode;
@@ -191,7 +198,26 @@ export const mpesaCallback = async (req, res) => {
         transaction.resultDesc = ResultDesc;
         transaction.status = "SUCCESS";
    
-    await transaction.save();
+        await transaction.save();
+
+
+
+        // ✅ AUTO-CONFIRM ORDER
+    // ===============================
+    if (transaction.orderId) {
+      const order = await MpesaOrder.findById(transaction.orderId);
+
+      if (order && !order.isPaid) {
+        order.isPaid = true;
+        order.paidAt = new Date();
+        order.paymentMethod = "M-PESA";
+        order.paymentReference = transaction.mpesaReceiptNumber;
+        order.status = "PAID";
+
+        await order.save();
+      }
+    }
+
     return res.json({ ResultCode: 0, ResultDesc: "Callback processed" });
   } catch (error) {
     console.error("MPESA CALLBACK ERROR:", error);

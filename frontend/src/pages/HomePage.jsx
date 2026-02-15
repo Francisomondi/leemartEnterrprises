@@ -41,6 +41,24 @@ const HomePage = () => {
         <p className="text-lg text-gray-400 mb-12">
           Discover amazing products, unbeatable deals, and a smooth shopping experience crafted just for you.
         </p>
+        
+       <p className="text-4xl text-gray-500">
+          Customer Care:&nbsp;
+          <a href="tel:0119712745" className="text-emerald-500 hover:underline">
+            Call
+          </a>
+          &nbsp;|&nbsp;
+          <a
+            href="https://wa.me/254119712745"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-emerald-500 hover:underline"
+          >
+            WhatsApp
+          </a>
+        </p>
+
+        
       </section>
 
       {/* Categories Section */}
