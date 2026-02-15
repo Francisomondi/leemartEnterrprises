@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { useProductStore } from "../stores/useProductStore";
 import axios from "../lib/axios";
 import { Helmet } from "react-helmet-async";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
 import { useCartStore } from "../stores/useCartStore";
-import { useNavigate } from 'react-router-dom';
 
 const ProductPage = () => {
   const { id } = useParams();
@@ -17,95 +16,91 @@ const ProductPage = () => {
   const [phone, setPhone] = useState("");
   const [loadingMpesa, setLoadingMpesa] = useState(false);
   const [mpesaMessage, setMpesaMessage] = useState("");
-  const { addToCart } = useCartStore();
-  const { clearCart } = useCartStore();
-  const navigate = useNavigate();
+  const [selectedSize, setSelectedSize] = useState(null);
 
+  const { addToCart, clearCart } = useCartStore();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchProductById(id);
+    setSelectedSize(null);
   }, [id, fetchProductById]);
 
-  /* ================= MPESA ================= */
- const handleMpesaPayment = async () => {
+  /* ================= SIZE LOGIC ================= */
+  const shoeCategories = ["shoes", "sandals"];
+  const isShoe = shoeCategories.includes(
+    selectedProduct?.category?.toLowerCase()
+  );
 
-	if (!phone) {
-		setMpesaMessage(" Enter phone number");
-		return;
-	}
-	
+  const sizeOptions = isShoe
+    ? Array.from({ length: 9 }, (_, i) => 37 + i) // 37–45
+    : ["S", "M", "L", "XL", "2XL"];
+
+  /* ================= MPESA ================= */
+  const handleMpesaPayment = async () => {
+    if (!phone) {
+      setMpesaMessage(" Enter phone number");
+      return;
+    }
+
     let formattedPhone = phone.trim();
     if (formattedPhone.startsWith("254")) {
       formattedPhone = "0" + formattedPhone.slice(3);
     }
 
-	// Basic validation
-	if (!/^0(7|1)\d{8}$/.test(formattedPhone)) {
-		setMpesaMessage("Enter a valid Safaricom number");
-		return;
-	}
+    if (!/^0(7|1)\d{8}$/.test(formattedPhone)) {
+      setMpesaMessage("Enter a valid Safaricom number");
+      return;
+    }
 
-	setLoadingMpesa(true);
-	setMpesaMessage("");
+    setLoadingMpesa(true);
+    setMpesaMessage("");
 
-	try {
-		const res = await axios.post("/mpesa/stk",
-			{
-				phone: formattedPhone,
-				amount: Number(selectedProduct.price),
-
-			},
-			 { timeout: 25000 }
-		);
-
-		console.log("MPESA RESPONSE:", res.data);
-		setMpesaMessage("📲 Check your phone to complete payment");
-     toast.success("📲 Check your phone");
-
-     const checkoutRequestID = res.data.checkoutRequestID;
-      pollPaymentStatus(checkoutRequestID);
-		
-	} catch (error) {
-			console.error("MPESA ERROR:", error);
-			setMpesaMessage(
-				error.response?.data?.message ||
-				"Failed to send STK push"
-			);
-      toast.error("Failed to initiate payment");
-			}
-			finally {
-			setLoadingMpesa(false);
-			}
-
-};
-const pollPaymentStatus = (checkoutRequestID) => {
-  const interval = setInterval(async () => {
     try {
-      const res = await axios.get(
-        `/mpesa/status/${checkoutRequestID}`
+      const res = await axios.post(
+        "/mpesa/stk",
+        {
+          phone: formattedPhone,
+          amount: Number(selectedProduct.price),
+        },
+        { timeout: 25000 }
       );
 
-      if (res.data.status === "SUCCESS") {
-        clearInterval(interval);
+      setMpesaMessage("📲 Check your phone to complete payment");
+      toast.success("📲 Check your phone");
 
-        toast.success("✅ Payment successful!");
-        clearCart();
-
-        setTimeout(() => {
-          navigate("/");
-        }, 1500);
-      }
-
-      if (res.data.status === "FAILED") {
-        clearInterval(interval);
-        toast.error("❌ Payment failed");
-      }
-    } catch (err) {
-      console.error(err);
+      pollPaymentStatus(res.data.checkoutRequestID);
+    } catch (error) {
+      setMpesaMessage(
+        error.response?.data?.message || "Failed to send STK push"
+      );
+      toast.error("Failed to initiate payment");
+    } finally {
+      setLoadingMpesa(false);
     }
-  }, 3000); // every 3 seconds
-};
+  };
 
+  const pollPaymentStatus = (checkoutRequestID) => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await axios.get(`/mpesa/status/${checkoutRequestID}`);
+
+        if (res.data.status === "SUCCESS") {
+          clearInterval(interval);
+          toast.success("✅ Payment successful!");
+          clearCart();
+          setTimeout(() => navigate("/"), 1500);
+        }
+
+        if (res.data.status === "FAILED") {
+          clearInterval(interval);
+          toast.error("❌ Payment failed");
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }, 3000);
+  };
 
   if (isLoading) {
     return <p className="text-center py-20 text-gray-300">Loading...</p>;
@@ -115,10 +110,14 @@ const pollPaymentStatus = (checkoutRequestID) => {
     return <p className="text-center py-20">Product not found</p>;
   }
 
-  const images = selectedProduct.images?.length   ? selectedProduct.images : selectedProduct.image ? [selectedProduct.image] : [];
+  const images = selectedProduct.images?.length
+    ? selectedProduct.images
+    : selectedProduct.image
+    ? [selectedProduct.image]
+    : [];
+
   const mainImage = images[activeImage] || images[0];
 
-  /* ================= RELATED ================= */
   const relatedProducts = products
     .filter(
       (p) =>
@@ -136,8 +135,7 @@ const pollPaymentStatus = (checkoutRequestID) => {
 
       <div className="max-w-6xl mx-auto px-4 py-20 text-white">
         <div className="grid md:grid-cols-2 gap-10">
-
-          {/* IMAGE GALLERY */}
+          {/* IMAGE */}
           <div>
             <img
               src={mainImage}
@@ -152,13 +150,11 @@ const pollPaymentStatus = (checkoutRequestID) => {
                     key={idx}
                     src={img}
                     onClick={() => setActiveImage(idx)}
-                    className={`h-20 w-20 cursor-pointer rounded border object-cover
-                      ${
-                        activeImage === idx
-                          ? "border-emerald-500"
-                          : "border-gray-700"
-                      }
-                    `}
+                    className={`h-20 w-20 cursor-pointer rounded border object-cover ${
+                      activeImage === idx
+                        ? "border-emerald-500"
+                        : "border-gray-700"
+                    }`}
                   />
                 ))}
               </div>
@@ -179,37 +175,60 @@ const pollPaymentStatus = (checkoutRequestID) => {
               KES {selectedProduct.price.toLocaleString("en-KE")}
             </p>
 
+            {/* SIZE SELECTOR */}
+            <div className="mt-6">
+              <p className="mb-2 text-sm text-gray-400">Select Size</p>
+              <div className="flex flex-wrap gap-2">
+                {sizeOptions.map((size) => (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => setSelectedSize(size)}
+                    className={`px-4 py-2 rounded border text-sm ${
+                      selectedSize === size
+                        ? "bg-emerald-600 border-emerald-600"
+                        : "border-gray-700 hover:border-emerald-500"
+                    }`}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ADD TO CART */}
+            <button
+              onClick={() => {
+                if (!selectedSize) {
+                  toast.error("Please select a size");
+                  return;
+                }
+
+                addToCart({
+                  ...selectedProduct,
+                  selectedSize,
+                });
+              }}
+              className="mt-6 w-full rounded bg-emerald-600 py-2 text-sm font-medium hover:bg-emerald-700"
+            >
+              Add to Cart
+            </button>
+
             {/* MPESA */}
             <input
               type="tel"
               placeholder="07XXXXXXXX"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className="mt-6 w-full rounded bg-gray-900 px-4 py-2 text-white"
+              className="mt-4 w-full rounded bg-gray-900 px-4 py-2"
             />
-            <button
-                        onClick={() => addToCart(selectedProduct)}
-                        className="mt-3 w-full rounded bg-emerald-600 py-2 text-sm font-medium hover:bg-emerald-700"
-                        >
-                        Add to Cart
-            </button>
+
             <motion.button
-              type="button"
               onClick={handleMpesaPayment}
               disabled={loadingMpesa}
-              whileHover={!loadingMpesa ? { scale: 1.05 } : {}}
-              whileTap={!loadingMpesa ? { scale: 0.95 } : {}}
-              className={`mt-4 w-full rounded-lg px-5 py-2.5 font-medium text-white
-                ${
-                  loadingMpesa
-                    ? "bg-gray-600 cursor-not-allowed"
-                    : "bg-emerald-600 hover:bg-emerald-700"
-                }
-              `}
+              className="mt-4 w-full rounded bg-emerald-600 py-2 font-medium"
             >
-              {loadingMpesa
-                ? "📲 Waiting for phone prompt..."
-                : "Buy now with M-PESA"}
+              Buy now with M-PESA
             </motion.button>
 
             {mpesaMessage && (
@@ -220,7 +239,7 @@ const pollPaymentStatus = (checkoutRequestID) => {
           </div>
         </div>
 
-        {/* RELATED PRODUCTS */}
+        {/* RELATED */}
         {relatedProducts.length > 0 && (
           <div className="mt-20">
             <h2 className="mb-6 text-2xl font-bold">Related Products</h2>
@@ -230,7 +249,7 @@ const pollPaymentStatus = (checkoutRequestID) => {
                 <Link
                   key={product._id}
                   to={`/product/${product._id}`}
-                  className="rounded-lg border border-gray-700 p-4 hover:scale-105 transition"
+                  className="rounded-lg border border-gray-700 p-4"
                 >
                   <img
                     src={product.images?.[0] || product.image}
@@ -240,14 +259,7 @@ const pollPaymentStatus = (checkoutRequestID) => {
                   <p className="text-emerald-400">
                     KES {product.price.toLocaleString("en-KE")}
                   </p>
-                       <button
-                        onClick={() => addToCart(product)}
-                        className="mt-3 w-full rounded bg-emerald-600 py-2 text-sm font-medium hover:bg-emerald-700"
-                        >
-                        Add to Cart
-                      </button>
                 </Link>
-                
               ))}
             </div>
           </div>

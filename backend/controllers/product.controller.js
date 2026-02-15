@@ -77,6 +77,8 @@ export const createProduct = async (req, res) => {
       price,
       category,
       images: imageUrls,
+	  sizes: req.body.sizes || [],
+  	  colors: req.body.colors || [],
     });
 
     res.status(201).json(product);
