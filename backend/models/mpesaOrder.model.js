@@ -43,7 +43,7 @@ const mpesaOrderSchema = new mongoose.Schema(
 
     paymentMethod: {
       type: String,
-      enum: ["MPESA"],
+      enum: ["MPESA","CARD"],
       default: "MPESA",
     },
 

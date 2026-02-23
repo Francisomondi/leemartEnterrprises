@@ -222,7 +222,7 @@ export const mpesaCallback = async (req, res) => {
       if (order && !order.isPaid) {
         order.isPaid = true;
         
-        order.paymentMethod = "M-PESA";
+        order.paymentMethod = "MPESA";
         order.paymentReference = transaction.mpesaReceiptNumber;
         order.status = "PAID";
 

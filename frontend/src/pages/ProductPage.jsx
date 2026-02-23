@@ -62,7 +62,7 @@ const ProductPage = () => {
       size: selectedSize,
     },
   ],
-});
+}); 
 
 const orderId = orderRes.data._id;
 

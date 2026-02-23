@@ -2,52 +2,25 @@ import { motion } from "framer-motion";
 import { useCartStore } from "../stores/useCartStore";
 import { Link, useNavigate } from "react-router-dom";
 import { MoveRight } from "lucide-react";
-import { loadStripe } from "@stripe/stripe-js";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
-import { useEffect, useState } from "react";
-
-const stripePromise = loadStripe(
-  "pk_test_51QECS1CuN2A0ZRg3Rd2xBu36onklMc2SDdezYRPo6C4Wuju4UkxQye229izbiYPtwK6t08g7WCaDzV0NZEoTMR1C00Gbcr6sIs"
-);
+import { useState } from "react";
 
 const OrderSummary = () => {
   const { total, subtotal, coupon, isCouponApplied, cart, clearCart } =
     useCartStore();
 
-  const [transactionId, setTransactionId] = useState(null);
   const [phone, setPhone] = useState("");
   const [loadingMpesa, setLoadingMpesa] = useState(false);
   const [mpesaMessage, setMpesaMessage] = useState("");
+
   const navigate = useNavigate();
-  
-
   const savings = subtotal - total;
-
-  // ---------------- STRIPE ----------------
-  const handlePayment = async () => {
-    try {
-      const stripe = await stripePromise;
-      const res = await axios.post("/payments/create-checkout-session", {
-        products: cart,
-        couponCode: coupon ? coupon.code : null,
-      });
-
-      const result = await stripe.redirectToCheckout({
-        sessionId: res.data.id,
-      });
-
-      if (result.error) {
-        toast.error("Stripe payment failed");
-      }
-    } catch (err) {
-      toast.error("Stripe checkout failed");
-    }
-  };
 
   // ---------------- MPESA ----------------
   const handleMpesaPayment = async () => {
     if (!phone) return setMpesaMessage("Enter phone number");
+    if (!cart.length) return setMpesaMessage("Your cart is empty");
 
     let formattedPhone = phone.trim();
     if (formattedPhone.startsWith("254")) {
@@ -60,60 +33,78 @@ const OrderSummary = () => {
 
     setLoadingMpesa(true);
     setMpesaMessage("");
-    const orderId = `LM-${Date.now()}`;
 
     try {
-      const res = await axios.post(
-        "/mpesa/stk",
-        { phone: formattedPhone, amount: total,orderId,},
-        { timeout: 20000 }
-      );
+      /**
+       * 1️⃣ CREATE ORDER (REAL ORDER ID)
+       */
+      const orderRes = await axios.post("/orders", {
+  items: cart.map((item) => ({
+    product: item._id,
+    name: item.name,
+    price: item.price,
+    quantity: item.quantity,
+  })),
+  totalAmount: total,
+});
 
-      setTransactionId(res.data.checkoutRequestID);
-      setMpesaMessage("📲 Check your phone to complete payment");
-      toast.success("📲 Check your phone");
-      
-      const checkoutRequestID = res.data.checkoutRequestID;
-      pollPaymentStatus(checkoutRequestID);
+console.log("ORDER CREATE RESPONSE:", orderRes.data);
 
+const orderId = orderRes.data._id;
+
+if (!orderId) {
+  toast.error("Order creation failed");
+  return;
+}
+
+const stkRes = await axios.post(
+  "/mpesa/stk",
+  {
+    phone: formattedPhone,
+    amount: total,
+    orderId,
+  },
+  { timeout: 20000 }
+);
+
+      toast.success("📲 Check your phone to complete payment");
+      setMpesaMessage("📲 Enter your M-PESA PIN");
+
+      pollPaymentStatus(stkRes.data.checkoutRequestID);
     } catch (error) {
+      console.error("MPESA ERROR:", error);
       setMpesaMessage(
-        error.response?.data?.message || "Failed to send STK push"
+        error.response?.data?.message || "Failed to initiate payment"
       );
     } finally {
       setLoadingMpesa(false);
-	  
     }
   };
 
   // -------- POLL MPESA STATUS --------
- const pollPaymentStatus = (checkoutRequestID) => {
-  const interval = setInterval(async () => {
-    try {
-      const res = await axios.get(
-        `/mpesa/status/${checkoutRequestID}`
-      );
+  const pollPaymentStatus = (checkoutRequestID) => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await axios.get(
+          `/mpesa/status/${checkoutRequestID}`
+        );
 
-      if (res.data.status === "SUCCESS") {
-        clearInterval(interval);
-
-        toast.success("✅ Payment successful!");
-        clearCart();
-
-        setTimeout(() => {
+        if (res.data.status === "SUCCESS") {
+          clearInterval(interval);
+          toast.success("✅ Payment successful!");
+          clearCart();
           navigate("/");
-        }, 1500);
-      }
+        }
 
-      if (res.data.status === "FAILED") {
-        clearInterval(interval);
-        toast.error("❌ Payment failed");
+        if (res.data.status === "FAILED") {
+          clearInterval(interval);
+          toast.error("❌ Payment failed");
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
       }
-    } catch (err) {
-      console.error(err);
-    }
-  }, 3000); // every 3 seconds
-};
+    }, 3000);
+  };
 
   // ---------------- UI ----------------
   return (
@@ -122,7 +113,9 @@ const OrderSummary = () => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
     >
-      <p className="text-xl font-semibold text-emerald-400">Order summary</p>
+      <p className="text-xl font-semibold text-emerald-400">
+        Order summary
+      </p>
 
       <div className="space-y-2">
         <div className="flex justify-between">
@@ -152,14 +145,6 @@ const OrderSummary = () => {
         </div>
       </div>
 
-      {/* STRIPE */}
-      <motion.button
-        onClick={handlePayment}
-        className="w-full rounded-lg bg-emerald-600 py-2.5 text-white hover:bg-emerald-700"
-      >
-        Pay with Card
-      </motion.button>
-
       {/* MPESA */}
       <input
         type="tel"
@@ -182,7 +167,9 @@ const OrderSummary = () => {
       </motion.button>
 
       {mpesaMessage && (
-        <p className="text-center text-sm text-emerald-400">{mpesaMessage}</p>
+        <p className="text-center text-sm text-emerald-400">
+          {mpesaMessage}
+        </p>
       )}
 
       <div className="flex justify-center gap-2">
