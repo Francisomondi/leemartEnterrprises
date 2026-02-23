@@ -123,30 +123,40 @@ export const updateProduct = async (req, res) => {
 
 
 export const deleteProduct = async (req, res) => {
-	try {
-		const product = await Product.findById(req.params.id);
+  try {
+    const product = await Product.findById(req.params.id);
 
-		if (!product) {
-			return res.status(404).json({ message: "Product not found" });
-		}
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
 
-		if (product.images) {
-			const publicId = product.images.split("/").pop().split(".")[0];
-			try {
-				await cloudinary.uploader.destroy(`products/${publicId}`);
-				console.log("deleted image from cloduinary");
-			} catch (error) {
-				console.log("error deleting image from cloduinary", error);
-			}
-		}
+    // ✅ images is an array
+    if (Array.isArray(product.images)) {
+      for (const imageUrl of product.images) {
+        const publicId = imageUrl
+          .split("/")
+          .pop()
+          .split(".")[0];
 
-		await Product.findByIdAndDelete(req.params.id);
+        try {
+          await cloudinary.uploader.destroy(`products/${publicId}`);
+          console.log("Deleted image from Cloudinary:", publicId);
+        } catch (error) {
+          console.log("Cloudinary delete error:", error.message);
+        }
+      }
+    }
 
-		res.json({ message: "Product deleted successfully" });
-	} catch (error) {
-		console.log("Error in deleteProduct controller", error.message);
-		res.status(500).json({ message: "Server error", error: error.message });
-	}
+    await product.deleteOne();
+
+    res.json({ message: "Product deleted successfully" });
+  } catch (error) {
+    console.log("Error in deleteProduct controller:", error.message);
+    res.status(500).json({
+      message: "Server error",
+      error: error.message,
+    });
+  }
 };
 
 export const getRecommendedProducts = async (req, res) => {

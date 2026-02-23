@@ -1,4 +1,4 @@
-
+import mongoose from "mongoose";
 import axios from "axios";
 import dotenv from "dotenv";
 import MpesaTransaction from "../models/mpesaTransaction.model.js";
@@ -48,8 +48,20 @@ export const stkPush = async (req, res) => {
     if (!phone || !amount || !orderId) {
       return res.status(400).json({
         success: false,
-        message: "Phone and amount are required",
+        message: "Phone and amount and orderId are required",
       });
+    }
+
+     // 🔒 HARD GUARD (THIS FIXES EVERYTHING)
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({
+        message: "Invalid orderId. Order must be created first.",
+      });
+    }
+
+    const order = await MpesaOrder.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
     }
 
     const safeAmount = Number(amount);
@@ -96,7 +108,7 @@ export const stkPush = async (req, res) => {
         PartyB: shortcode,
         PhoneNumber: phoneNumber,
         CallBackURL: callbackUrl,
-        AccountReference: orderId, // 
+        AccountReference: "leemart investments",
         TransactionDesc: "Leemart Checkout",
       },
       {
@@ -111,7 +123,7 @@ export const stkPush = async (req, res) => {
 
     const mpesaTransaction = await MpesaTransaction.create({
       user: req.user?._id,
-      orderId, // ✅ VERY IMPORTANT
+      orderId: order._id,
       merchantRequestID: MerchantRequestID,
       checkoutRequestID: CheckoutRequestID,
       phoneNumber,
@@ -209,7 +221,7 @@ export const mpesaCallback = async (req, res) => {
 
       if (order && !order.isPaid) {
         order.isPaid = true;
-        order.paidAt = new Date();
+        
         order.paymentMethod = "M-PESA";
         order.paymentReference = transaction.mpesaReceiptNumber;
         order.status = "PAID";

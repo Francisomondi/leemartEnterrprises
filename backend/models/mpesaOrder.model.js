@@ -1,4 +1,4 @@
-// models/Order.js
+// models/mpesaOrder.model.js
 import mongoose from "mongoose";
 
 const mpesaOrderSchema = new mongoose.Schema(
@@ -16,14 +16,29 @@ const mpesaOrderSchema = new mongoose.Schema(
           ref: "Product",
           required: true,
         },
-        quantity: Number,
-        price: Number,
+        quantity: {
+          type: Number,
+          required: true,
+        },
+        price: {
+          type: Number,
+          required: true,
+        },
       },
     ],
 
     totalAmount: {
       type: Number,
       required: true,
+    },
+
+    isPaid: {
+      type: Boolean,
+      default: false,
+    },
+
+    paidAt: {
+      type: Date,
     },
 
     paymentMethod: {
@@ -38,12 +53,18 @@ const mpesaOrderSchema = new mongoose.Schema(
       default: "PENDING",
     },
 
+    paymentReference: {
+      type: String,
+    },
+
     mpesaTransaction: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "MpesaTransaction",
     },
 
-    mpesaReceiptNumber: String,
+    mpesaReceiptNumber: {
+      type: String,
+    },
   },
   { timestamps: true }
 );

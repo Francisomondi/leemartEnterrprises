@@ -60,11 +60,12 @@ const OrderSummary = () => {
 
     setLoadingMpesa(true);
     setMpesaMessage("");
+    const orderId = `LM-${Date.now()}`;
 
     try {
       const res = await axios.post(
         "/mpesa/stk",
-        { phone: formattedPhone, amount: total },
+        { phone: formattedPhone, amount: total,orderId,},
         { timeout: 20000 }
       );
 

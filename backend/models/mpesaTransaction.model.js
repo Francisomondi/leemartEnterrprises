@@ -1,3 +1,4 @@
+// models/mpesaTransaction.model.js
 import mongoose from "mongoose";
 
 const mpesaTransactionSchema = new mongoose.Schema(
@@ -5,21 +6,47 @@ const mpesaTransactionSchema = new mongoose.Schema(
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true, // allow guest payments
+      required: false, // ✅ allow guest payments
     },
-    orderId: { type: mongoose.Schema.Types.ObjectId, ref: "MpesaOrder" },
 
-    merchantRequestID: { type: String },
-    checkoutRequestID: { type: String, index: true },
+    orderId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "MpesaOrder",
+      required: true, // ✅ every payment must belong to an order
+    },
 
-    phoneNumber: { type: String, required: true },
-    amount: { type: Number },
+    merchantRequestID: {
+      type: String,
+      required: true,
+    },
 
-    resultCode: { type: Number },
-    resultDesc: { type: String },
+    checkoutRequestID: {
+      type: String,
+      required: true,
+      index: true,
+      unique: true, // ✅ prevents duplicate callbacks
+    },
 
-    mpesaReceiptNumber: { type: String },
-    transactionDate: { type: String },
+    phoneNumber: {
+      type: String,
+      required: true,
+    },
+
+    amount: {
+      type: Number,
+      required: true,
+    },
+
+    resultCode: Number,
+    resultDesc: String,
+
+    mpesaReceiptNumber: {
+      type: String,
+    },
+
+    transactionDate: {
+      type: String,
+    },
 
     status: {
       type: String,
@@ -27,7 +54,9 @@ const mpesaTransactionSchema = new mongoose.Schema(
       default: "PENDING",
     },
 
-    rawCallback: { type: Object }, // full callback for debugging
+    rawCallback: {
+      type: Object, // full callback payload (debugging & audits)
+    },
   },
   { timestamps: true }
 );

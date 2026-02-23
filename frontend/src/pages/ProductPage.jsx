@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import toast from "react-hot-toast";
 import { useCartStore } from "../stores/useCartStore";
 
+
 const ProductPage = () => {
   const { id } = useParams();
   const { fetchProductById, selectedProduct, isLoading, products } =
@@ -26,72 +27,79 @@ const ProductPage = () => {
     setSelectedSize(null);
   }, [id, fetchProductById]);
 
-  /* ================= SIZE LOGIC ================= */
+  // SIZE LOGIC
   const shoeCategories = ["shoes", "sandals"];
   const isShoe = shoeCategories.includes(
     selectedProduct?.category?.toLowerCase()
   );
-
   const sizeOptions = isShoe
-    ? Array.from({ length: 9 }, (_, i) => 37 + i) // 37–45
+    ? Array.from({ length: 9 }, (_, i) => 37 + i)
     : ["S", "M", "L", "XL", "2XL"];
 
-  /* ================= MPESA ================= */
+  // MPESA PAYMENT
   const handleMpesaPayment = async () => {
-    if (!phone) {
-      setMpesaMessage(" Enter phone number");
-      return;
-    }
+  if (!phone) return toast.error("Enter phone number");
+  if (!selectedSize) return toast.error("Please select a size");
 
-    let formattedPhone = phone.trim();
-    if (formattedPhone.startsWith("254")) {
-      formattedPhone = "0" + formattedPhone.slice(3);
-    }
+  let formattedPhone = phone.trim();
+  if (formattedPhone.startsWith("254")) {
+    formattedPhone = "0" + formattedPhone.slice(3);
+  }
 
-    if (!/^0(7|1)\d{8}$/.test(formattedPhone)) {
-      setMpesaMessage("Enter a valid Safaricom number");
-      return;
-    }
+  if (!/^0(7|1)\d{8}$/.test(formattedPhone)) {
+    return toast.error("Enter a valid Safaricom number");
+  }
 
+  try {
     setLoadingMpesa(true);
-    setMpesaMessage("");
 
-    try {
-      const res = await axios.post(
-        "/mpesa/stk",
-        {
-          phone: formattedPhone,
-          amount: Number(selectedProduct.price),
-        },
-        { timeout: 25000 }
-      );
+    // ✅ 1. CREATE ORDER
+   const orderRes = await axios.post("/orders", {
+  items: [
+    {
+      product: selectedProduct._id,
+      quantity: 1,
+      size: selectedSize,
+    },
+  ],
+});
 
-      setMpesaMessage("📲 Check your phone to complete payment");
-      toast.success("📲 Check your phone");
+const orderId = orderRes.data._id;
 
-      pollPaymentStatus(res.data.checkoutRequestID);
-    } catch (error) {
-      setMpesaMessage(
-        error.response?.data?.message || "Failed to send STK push"
-      );
-      toast.error("Failed to initiate payment");
-    } finally {
-      setLoadingMpesa(false);
-    }
-  };
+    // ✅ 2. SEND MPESA WITH REAL ORDER ID
+    const payload = {
+      phone: formattedPhone,
+      amount: selectedProduct.price,
+      orderId: orderId,
+    };
+
+    console.log("MPESA PAYLOAD:", payload);
+
+    const res = await axios.post("/mpesa/stk", payload, {
+      timeout: 25000,
+    });
+
+    toast.success("📲 Check your phone");
+
+    pollPaymentStatus(res.data.checkoutRequestID);
+  } catch (error) {
+    console.error("MPESA ERROR:", error);
+    toast.error(error.response?.data?.message || "Payment failed");
+  } finally {
+    setLoadingMpesa(false);
+  }
+};
 
   const pollPaymentStatus = (checkoutRequestID) => {
     const interval = setInterval(async () => {
       try {
         const res = await axios.get(`/mpesa/status/${checkoutRequestID}`);
-
         if (res.data.status === "SUCCESS") {
           clearInterval(interval);
           toast.success("✅ Payment successful!");
           clearCart();
           setTimeout(() => navigate("/"), 1500);
         }
-
         if (res.data.status === "FAILED") {
           clearInterval(interval);
           toast.error("❌ Payment failed");
@@ -102,20 +110,14 @@ const ProductPage = () => {
     }, 3000);
   };
 
-  if (isLoading) {
-    return <p className="text-center py-20 text-gray-300">Loading...</p>;
-  }
-
-  if (!selectedProduct) {
-    return <p className="text-center py-20">Product not found</p>;
-  }
+  if (isLoading) return <p className="text-center py-20 text-gray-300">Loading...</p>;
+  if (!selectedProduct) return <p className="text-center py-20">Product not found</p>;
 
   const images = selectedProduct.images?.length
     ? selectedProduct.images
     : selectedProduct.image
     ? [selectedProduct.image]
     : [];
-
   const mainImage = images[activeImage] || images[0];
 
   const relatedProducts = products
@@ -137,12 +139,7 @@ const ProductPage = () => {
         <div className="grid md:grid-cols-2 gap-10">
           {/* IMAGE */}
           <div>
-            <img
-              src={mainImage}
-              alt={selectedProduct.name}
-              className="w-full rounded-xl object-cover"
-            />
-
+            <img src={mainImage} alt={selectedProduct.name} className="w-full rounded-xl object-cover" />
             {images.length > 1 && (
               <div className="mt-4 flex gap-3">
                 {images.map((img, idx) => (
@@ -151,9 +148,7 @@ const ProductPage = () => {
                     src={img}
                     onClick={() => setActiveImage(idx)}
                     className={`h-20 w-20 cursor-pointer rounded border object-cover ${
-                      activeImage === idx
-                        ? "border-emerald-500"
-                        : "border-gray-700"
+                      activeImage === idx ? "border-emerald-500" : "border-gray-700"
                     }`}
                   />
                 ))}
@@ -163,19 +158,11 @@ const ProductPage = () => {
 
           {/* DETAILS */}
           <div>
-            <h1 className="text-4xl font-bold text-emerald-400">
-              {selectedProduct.name}
-            </h1>
+            <h1 className="text-4xl font-bold text-emerald-400">{selectedProduct.name}</h1>
+            <p className="mt-4 text-gray-300">{selectedProduct.description}</p>
+            <p className="mt-6 text-3xl font-bold">KES {selectedProduct.price.toLocaleString("en-KE")}</p>
 
-            <p className="mt-4 text-gray-300">
-              {selectedProduct.description}
-            </p>
-
-            <p className="mt-6 text-3xl font-bold">
-              KES {selectedProduct.price.toLocaleString("en-KE")}
-            </p>
-
-            {/* SIZE SELECTOR */}
+            {/* SIZE */}
             <div className="mt-6">
               <p className="mb-2 text-sm text-gray-400">Select Size</p>
               <div className="flex flex-wrap gap-2">
@@ -185,9 +172,7 @@ const ProductPage = () => {
                     type="button"
                     onClick={() => setSelectedSize(size)}
                     className={`px-4 py-2 rounded border text-sm ${
-                      selectedSize === size
-                        ? "bg-emerald-600 border-emerald-600"
-                        : "border-gray-700 hover:border-emerald-500"
+                      selectedSize === size ? "bg-emerald-600 border-emerald-600" : "border-gray-700 hover:border-emerald-500"
                     }`}
                   >
                     {size}
@@ -198,17 +183,7 @@ const ProductPage = () => {
 
             {/* ADD TO CART */}
             <button
-              onClick={() => {
-                if (!selectedSize) {
-                  toast.error("Please select a size");
-                  return;
-                }
-
-                addToCart({
-                  ...selectedProduct,
-                  selectedSize,
-                });
-              }}
+              onClick={() => addToCart({ ...selectedProduct, selectedSize })}
               className="mt-6 w-full rounded bg-emerald-600 py-2 text-sm font-medium hover:bg-emerald-700"
             >
               Add to Cart
@@ -222,7 +197,6 @@ const ProductPage = () => {
               onChange={(e) => setPhone(e.target.value)}
               className="mt-4 w-full rounded bg-gray-900 px-4 py-2"
             />
-
             <motion.button
               onClick={handleMpesaPayment}
               disabled={loadingMpesa}
@@ -231,11 +205,7 @@ const ProductPage = () => {
               Buy now with M-PESA
             </motion.button>
 
-            {mpesaMessage && (
-              <p className="mt-3 text-center text-sm text-emerald-400">
-                {mpesaMessage}
-              </p>
-            )}
+            {mpesaMessage && <p className="mt-3 text-center text-sm text-emerald-400">{mpesaMessage}</p>}
           </div>
         </div>
 
@@ -243,22 +213,12 @@ const ProductPage = () => {
         {relatedProducts.length > 0 && (
           <div className="mt-20">
             <h2 className="mb-6 text-2xl font-bold">Related Products</h2>
-
             <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-6">
               {relatedProducts.map((product) => (
-                <Link
-                  key={product._id}
-                  to={`/product/${product._id}`}
-                  className="rounded-lg border border-gray-700 p-4"
-                >
-                  <img
-                    src={product.images?.[0] || product.image}
-                    className="h-40 w-full object-cover rounded"
-                  />
+                <Link key={product._id} to={`/product/${product._id}`} className="rounded-lg border border-gray-700 p-4">
+                  <img src={product.images?.[0] || product.image} className="h-40 w-full object-cover rounded" />
                   <p className="mt-2 font-semibold">{product.name}</p>
-                  <p className="text-emerald-400">
-                    KES {product.price.toLocaleString("en-KE")}
-                  </p>
+                  <p className="text-emerald-400">KES {product.price.toLocaleString("en-KE")}</p>
                 </Link>
               ))}
             </div>
