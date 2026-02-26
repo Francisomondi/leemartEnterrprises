@@ -20,6 +20,7 @@ import { useCartStore } from "./stores/useCartStore";
 import PurchaseSuccessPage from "./pages/PurchaseSuccessPage";
 import PurchaseCancelPage from "./pages/PurchaseCancelPage";
 import ProfilePage from "./pages/ProfilePage";
+import AllProducts from "./pages/AllProducts";
 
 
 
@@ -77,6 +78,7 @@ function App() {
 						<Route path='/contact' element={<ContactPage />} />
 						<Route path="/product/:id" element={<ProductPage />} />
 						<Route path="/profile" element={user ? <ProfilePage/> : <Navigate to="/login" />} />
+						<Route path="/products" element={<AllProducts />} />
 					</Routes>
 				</main>
 

@@ -17,11 +17,12 @@ import { upload } from "../middleware/multer.js";
 const router = express.Router();
 
 router.get("/", protectRoute, adminRoute, getAllProducts);
+router.get("/products", getAllProducts);
 router.get("/featured", getFeaturedProducts);
 
 router.get("/category/:category", getProductsByCategory);
 router.get("/recommendations", getRecommendedProducts);
-router.post("/", upload.array("images",6), protectRoute, adminRoute, createProduct);
+router.post("/", upload.array("images",8), protectRoute, adminRoute, createProduct);
 router.get("/:id", getProductById);
 router.patch("/products/:id", updateProduct);
 router.patch("/:id", protectRoute, adminRoute, toggleFeaturedProduct);

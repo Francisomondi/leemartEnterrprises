@@ -88,7 +88,7 @@ const HomePage = () => {
           </a>
 
           <a
-            href="#deals"
+            href="/products"
             className="px-10 py-4 rounded-full border border-gray-600 text-gray-300 hover:text-emerald-400 hover:border-emerald-400 transition"
           >
             🔥 View Deals
