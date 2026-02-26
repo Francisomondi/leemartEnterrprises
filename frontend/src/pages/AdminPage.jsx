@@ -1,5 +1,11 @@
-import { BarChart, PlusCircle, ShoppingBasket ,Wallet} from "lucide-react";
-import { useEffect, useState } from "react";
+import {
+  BarChart,
+  PlusCircle,
+  ShoppingBasket,
+  Wallet,
+  Package,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 
 import AnalyticsTab from "../components/AnalyticsTab";
@@ -9,145 +15,233 @@ import MpesaAnalyticsTab from "../components/MpesaAnalyticsTab";
 import { useProductStore } from "../stores/useProductStore";
 import axiosInstance from "../lib/axios";
 
-
-
-
-
-
 const tabs = [
-	{ id: "create", label: "Create Product", icon: PlusCircle },
-	{ id: "products", label: "Products", icon: ShoppingBasket },
-	{ id: "analytics", label: "Analytics", icon: BarChart },
-	{ id: "mpesa", label: "MPESA", icon: Wallet },
-	 { id: "mpesa-analytics", label: "MPESA Analytics", icon: BarChart },
+  { id: "create", label: "Create Product", icon: PlusCircle },
+  { id: "products", label: "Products", icon: ShoppingBasket },
+  { id: "analytics", label: "Analytics", icon: BarChart },
+  { id: "mpesa", label: "MPESA", icon: Wallet },
+  { id: "orders", label: "Orders", icon: Package },
+  { id: "mpesa-analytics", label: "MPESA Analytics", icon: BarChart },
 ];
 
 const AdminPage = () => {
-	const [activeTab, setActiveTab] = useState("create");
-	const { fetchAllProducts } = useProductStore();
-	const [transactions, setTransactions] = useState([]);
-	const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("create");
+  const { fetchAllProducts } = useProductStore();
 
-	const fetchAllMpesaTransactions = async () => {
-	
-		try {
-			const res = await axiosInstance.get("/mpesa/all", {
-			withCredentials: true,
-			});
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-			setTransactions(res.data.transactions || []);
-		} catch (error) {
-			console.error("Failed to fetch MPESA transactions:", error);
-		} finally {
-			setLoading(false);
-		}
-	};
+  const fetchAllMpesaTransactions = async () => {
+    try {
+      const res = await axiosInstance.get("/mpesa/all", {
+        withCredentials: true,
+      });
 
+      setTransactions(res.data.transactions || []);
+    } catch (error) {
+      console.error("Failed to fetch MPESA transactions:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-	useEffect(() => {
-	fetchAllProducts();
-	fetchAllMpesaTransactions();
+  useEffect(() => {
+    fetchAllProducts();
+    fetchAllMpesaTransactions();
+  }, [fetchAllProducts]);
 
-	}, [fetchAllProducts]);
+  /**
+   * ONLY SUCCESSFUL ORDERS
+   */
+  const successfulOrders = useMemo(
+    () => transactions.filter((t) => t.status === "SUCCESS"),
+    [transactions]
+  );
 
-	return (
-	<div className='min-h-screen relative overflow-hidden'>
-			<div className='relative z-10 container mx-auto px-4 py-16'>
-				<motion.h1
-					className='text-4xl font-bold mb-8 text-emerald-400 text-center'
-					initial={{ opacity: 0, y: -20 }}
-					animate={{ opacity: 1, y: 0 }}
-					transition={{ duration: 0.8 }}
-				>
-					Admin Dashboard
-				</motion.h1>
+  /**
+   * Normalize products/items safely
+   */
+  const getOrderProducts = (order) => {
+    if (Array.isArray(order.products) && order.products.length > 0) {
+      return order.products;
+    }
 
-				<div className='flex justify-center mb-8'>
-					{tabs.map((tab) => (
-						<button
-							key={tab.id}
-							onClick={() => setActiveTab(tab.id)}
-							className={`flex items-center px-4 py-2 mx-2 rounded-md transition-colors duration-200 ${
-								activeTab === tab.id
-									? "bg-emerald-600 text-white"
-									: "bg-gray-700 text-gray-300 hover:bg-gray-600"
-							}`}
-						>
-							<tab.icon className='mr-2 h-5 w-5' />
-							{tab.label}
-						</button>
-					))}
-				</div>
-				{activeTab === "create" && <CreateProductForm />}
-				{activeTab === "products" && <ProductsList />}
-				{activeTab === "analytics" && <AnalyticsTab />}
-				{activeTab === "mpesa-analytics" && (<MpesaAnalyticsTab transactions={transactions} />)}
-				
-			</div>
+    if (Array.isArray(order.items) && order.items.length > 0) {
+      return order.items.map((item) => ({
+        name:
+          item.name ||
+          item.product?.name ||
+          item.productId?.name ||
+          "Unknown product",
+        quantity: item.quantity || 1,
+      }));
+    }
 
-		{activeTab === "mpesa" && (
-  			<div className="p-6 rounded shadow">
-				<h2 className="text-2xl font-bold mb-4">MPESA Transactions</h2>
+    return [];
+  };
 
-				{loading ? (
-				<p>Loading transactions...</p>
-				) : !Array.isArray(transactions) || transactions.length === 0 ? (
-				<p>No MPESA transactions found.</p>
-				) : (
-				<table className="w-full border">
-					<thead>
-					<tr className="bg-gray-900">
-						<th className="p-2">User</th>
-						<th className="p-2">Phone</th>
-						<th className="p-2">Receipt</th>
-						<th className="p-2">Amount</th>
-						<th className="p-2">Status</th>
-						<th className="p-2">Date</th>
-					</tr>
-					</thead>
+  return (
+    <div className="min-h-screen relative overflow-hidden">
+      <div className="relative z-10 container mx-auto px-4 py-16">
+        <motion.h1
+          className="text-4xl font-bold mb-8 text-emerald-400 text-center"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          Admin Dashboard
+        </motion.h1>
 
-					<tbody>
-					{transactions.map((tx) => (
-						<tr key={tx._id} className="border-t">
-						<td className="p-2">
-							{tx.user?.name || "—"}
-							<br />
-							<span className="text-xs text-gray-500">
-							{tx.user?.email}
-							</span>
-						</td>
+        {/* TABS */}
+        <div className="flex flex-wrap justify-center mb-10 gap-2">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center px-4 py-2 rounded-md transition ${
+                activeTab === tab.id
+                  ? "bg-emerald-600 text-white"
+                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+              }`}
+            >
+              <tab.icon className="mr-2 h-5 w-5" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-						<td className="p-2">{tx.phoneNumber || "—"}</td>
-						<td className="p-2">{tx.mpesaReceiptNumber || "—"}</td>
-						<td className="p-2 font-semibold">KES {tx.amount}</td>
+        {/* TAB CONTENT */}
+        {activeTab === "create" && <CreateProductForm />}
+        {activeTab === "products" && <ProductsList />}
+        {activeTab === "analytics" && <AnalyticsTab />}
+        {activeTab === "mpesa-analytics" && (
+          <MpesaAnalyticsTab transactions={transactions} />
+        )}
 
-						<td className="p-2">
-							<span
-							className={
-								tx.status === "SUCCESS"
-								? "text-green-600"
-								: tx.status === "FAILED"
-								? "text-red-600"
-								: "text-yellow-600"
-							}
-							>
-							{tx.status}
-							</span>
-						</td>
+        {/* MPESA TRANSACTIONS */}
+        {activeTab === "mpesa" && (
+          <div className="p-6 rounded-lg bg-gray-800 shadow">
+            <h2 className="text-2xl font-bold mb-4 text-emerald-400">
+              MPESA Transactions
+            </h2>
 
-						<td className="p-2">
-							{new Date(tx.createdAt).toLocaleString()}
-						</td>
-						</tr>
-					))}
-					</tbody>
-				</table>
-				)}
-			</div>
-		)}
+            {loading ? (
+              <p>Loading transactions...</p>
+            ) : transactions.length === 0 ? (
+              <p>No MPESA transactions found.</p>
+            ) : (
+              <table className="w-full border border-gray-700 text-sm">
+                <thead className="bg-gray-900">
+                  <tr>
+                    <th className="p-2">User</th>
+                    <th className="p-2">Phone</th>
+                    <th className="p-2">Receipt</th>
+                    <th className="p-2">Amount</th>
+                    <th className="p-2">Status</th>
+                    <th className="p-2">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.map((tx) => (
+                    <tr key={tx._id} className="border-t">
+                      <td className="p-2">
+                        {tx.user?.name || "—"}
+                        <div className="text-xs text-gray-500">
+                          {tx.user?.email}
+                        </div>
+                      </td>
+                      <td className="p-2">{tx.phoneNumber}</td>
+                      <td className="p-2">{tx.mpesaReceiptNumber || "—"}</td>
+                      <td className="p-2 font-semibold">KES {tx.amount}</td>
+                      <td className="p-2">{tx.status}</td>
+                      <td className="p-2">
+                        {new Date(tx.createdAt).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
 
+        {/* ORDERS TAB (SUCCESSFUL ONLY) */}
+        {activeTab === "orders" && (
+          <div className="p-6 rounded-lg bg-gray-800 shadow">
+            <h2 className="text-2xl font-bold mb-6 text-emerald-400">
+              Successful Orders
+            </h2>
 
-	</div>
-	);
+            {successfulOrders.length === 0 ? (
+              <p>No successful orders yet.</p>
+            ) : (
+              <table className="w-full border border-gray-700 text-sm">
+                <thead className="bg-gray-900">
+                  <tr>
+                    <th className="p-2">Customer</th>
+                    <th className="p-2">Products</th>
+                    <th className="p-2">Amount</th>
+                    <th className="p-2">Receipt</th>
+                    <th className="p-2">Order ID</th>
+                    <th className="p-2">Date</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {successfulOrders.map((order) => {
+                    const products = getOrderProducts(order);
+
+                    return (
+                      <tr key={order._id} className="border-t align-top">
+                        <td className="p-2">
+                          {order.user?.name || "—"}
+                          <div className="text-xs text-gray-500">
+                            {order.user?.email}
+                          </div>
+                        </td>
+
+                        <td className="p-2">
+                          {products.length > 0 ? (
+                            <ul className="space-y-1">
+                              {products.map((p, idx) => (
+                                <li key={idx}>
+                                  • {p.name}
+                                  {p.quantity && (
+                                    <span className="text-gray-400">
+                                      {" "}
+                                      × {p.quantity}
+                                    </span>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <span className="text-gray-500">
+                              No product data
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="p-2 font-semibold">
+                          KES {order.amount}
+                        </td>
+                        <td className="p-2 font-mono">
+                          {order.mpesaReceiptNumber}
+                        </td>
+                        <td className="p-2">{order.orderId || "—"}</td>
+                        <td className="p-2">
+                          {new Date(order.createdAt).toLocaleString()}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };
+
 export default AdminPage;

@@ -3,46 +3,61 @@ import Product from "../models/product.model.js";
 
 export const createMpesaOrder = async (req, res) => {
   try {
-    const { items } = req.body;
+    const { items, totalAmount } = req.body;
 
-    if (!req.user) {
-      return res.status(401).json({ message: "Not authenticated" });
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: "No order items" });
     }
 
-    if (!items || !items.length) {
-      return res.status(400).json({ message: "Items are required" });
+    // ✅ Validate & normalize items
+    const formattedItems = items.map((item, index) => {
+      if (!item.product) {
+        throw new Error(`Missing product ID at item index ${index}`);
+      }
+
+      return {
+        product: item.product,   // MUST be Product ObjectId
+        quantity: Number(item.quantity) || 1,
+        price: Number(item.price),
+      };
+    });
+
+    if (!totalAmount || totalAmount <= 0) {
+      return res.status(400).json({ message: "Invalid total amount" });
     }
-
-    let totalAmount = 0;
-
-    const enrichedItems = await Promise.all(
-      items.map(async (item) => {
-        const product = await Product.findById(item.product);
-        if (!product) throw new Error("Product not found");
-
-        const price = product.price;
-        const quantity = item.quantity || 1;
-        totalAmount += price * quantity;
-
-        return {
-          product: product._id,
-          price,
-          quantity,
-          size: item.size,
-        };
-      })
-    );
 
     const order = await MpesaOrder.create({
-      user: req.user._id,   // ✅ FIX IS HERE
-      items: enrichedItems,
+      user: req.user._id,
+      items: formattedItems,
       totalAmount,
+      paymentMethod: "MPESA", // enum-safe
       paymentStatus: "PENDING",
     });
 
+    // 🔍 DEBUG (remove after confirming once)
+    console.log("ORDER CREATED:", order._id);
+    console.log("ORDER ITEMS:", order.items);
+
     res.status(201).json(order);
   } catch (error) {
-    console.error("CREATE ORDER ERROR:", error);
-    res.status(500).json({ message: error.message });
+    console.error("CREATE ORDER ERROR:", error.message);
+    res.status(500).json({ message: error.message || "Order creation failed" });
+  }
+};
+
+
+export const getOrderById = async (req, res) => {
+  try {
+    const order = await MpesaOrder.findById(req.params.id)
+      .populate("items.product", "name price image");
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    res.json(order);
+  } catch (error) {
+    console.error("GET ORDER ERROR:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };

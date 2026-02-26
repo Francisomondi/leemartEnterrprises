@@ -202,8 +202,10 @@ const orderId = orderRes.data._id;
               disabled={loadingMpesa}
               className="mt-4 w-full rounded bg-emerald-600 py-2 font-medium"
             >
-              Buy now with M-PESA
+              {loadingMpesa ? "Sending STK..." : "Pay Now via M-pesa"}
             </motion.button>
+
+            
 
             {mpesaMessage && <p className="mt-3 text-center text-sm text-emerald-400">{mpesaMessage}</p>}
           </div>
