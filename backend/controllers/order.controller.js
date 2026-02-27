@@ -22,14 +22,14 @@ export const createMpesaOrder = async (req, res) => {
       };
     });
 
-    if (!totalAmount || totalAmount <= 0) {
+    if (!totalAmount || totalAmount <= 0 || isNaN(totalAmount)) {
       return res.status(400).json({ message: "Invalid total amount" });
     }
 
     const order = await MpesaOrder.create({
       user: req.user._id,
       items: formattedItems,
-      totalAmount,
+      totalAmount: totalAmount || formattedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0),
       paymentMethod: "MPESA", // enum-safe
       paymentStatus: "PENDING",
     });
