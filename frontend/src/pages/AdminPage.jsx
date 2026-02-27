@@ -27,7 +27,8 @@ const tabs = [
 const AdminPage = () => {
   const [activeTab, setActiveTab] = useState("create");
   const { fetchAllProducts } = useProductStore();
-
+  const [successfulOrders, setSuccessfulOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -48,37 +49,39 @@ const AdminPage = () => {
   useEffect(() => {
     fetchAllProducts();
     fetchAllMpesaTransactions();
+    fetchSuccessfulOrders()
   }, [fetchAllProducts]);
 
   /**
    * ONLY SUCCESSFUL ORDERS
    */
-  const successfulOrders = useMemo(
-    () => transactions.filter((t) => t.status === "SUCCESS"),
-    [transactions]
-  );
-
+  //const successfulOrders = orders;
   /**
    * Normalize products/items safely
    */
+
+
+  const fetchSuccessfulOrders = async () => {
+  try {
+    const res = await axiosInstance.get("/orders/success", {
+      withCredentials: true,
+    });
+
+    setSuccessfulOrders(res.data || []);
+  } catch (error) {
+    console.error("Failed to fetch orders:", error);
+  } finally {
+    setOrdersLoading(false);
+  }
+};
   const getOrderProducts = (order) => {
-    if (Array.isArray(order.products) && order.products.length > 0) {
-      return order.products;
-    }
+  if (!order?.items) return [];
 
-    if (Array.isArray(order.items) && order.items.length > 0) {
-      return order.items.map((item) => ({
-        name:
-          item.name ||
-          item.product?.name ||
-          item.productId?.name ||
-          "Unknown product",
-        quantity: item.quantity || 1,
-      }));
-    }
-
-    return [];
-  };
+  return order.items.map((item) => ({
+    name: item.product?.name,
+    quantity: item.quantity || 1,
+  }));
+};
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -222,12 +225,12 @@ const AdminPage = () => {
                         </td>
 
                         <td className="p-2 font-semibold">
-                          KES {order.amount}
+                          KES {order.totalAmount}
                         </td>
                         <td className="p-2 font-mono">
                           {order.mpesaReceiptNumber}
                         </td>
-                        <td className="p-2">{order.orderId || "—"}</td>
+                        <td className="p-2">{order._id|| "—"}</td>
                         <td className="p-2">
                           {new Date(order.createdAt).toLocaleString()}
                         </td>

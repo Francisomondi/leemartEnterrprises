@@ -183,10 +183,16 @@ export const mpesaCallback = async (req, res) => {
     }
 
      if (ResultCode !== 0) {
-      transaction.status = "FAILED";
-      transaction.resultCode = ResultCode;
-      transaction.resultDesc = ResultDesc;
-      await transaction.save();
+      if (transaction.orderId) {
+        await MpesaOrder.findByIdAndUpdate(transaction.orderId, {
+          paymentStatus: "FAILED",
+        });
+         transaction.status = "FAILED";
+        transaction.resultCode = ResultCode;
+         transaction.resultDesc = ResultDesc;
+      }
+     
+      
 
       return res.json({ ResultCode: 0, ResultDesc: "Callback processed" });
 
@@ -216,19 +222,23 @@ export const mpesaCallback = async (req, res) => {
 
         // ✅ AUTO-CONFIRM ORDER
     // ===============================
-    if (transaction.orderId) {
-      const order = await MpesaOrder.findById(transaction.orderId);
+   // ✅ AUTO-CONFIRM ORDER (FIXED)
+if (transaction.orderId) {
+  const order = await MpesaOrder.findById(transaction.orderId);
 
-      if (order && !order.isPaid) {
-        order.isPaid = true;
-        
-        order.paymentMethod = "MPESA";
-        order.paymentReference = transaction.mpesaReceiptNumber;
-        order.status = "PAID";
+  if (order && !order.isPaid) {
+    order.isPaid = true;
+    order.paymentStatus = "PAID";
+    order.paidAt = new Date();
 
-        await order.save();
-      }
-    }
+    order.paymentMethod = "MPESA";
+    order.paymentReference = transaction.mpesaReceiptNumber;
+    order.mpesaReceiptNumber = transaction.mpesaReceiptNumber;
+    order.mpesaTransaction = transaction._id;
+
+    await order.save();
+  }
+}
 
     return res.json({ ResultCode: 0, ResultDesc: "Callback processed" });
   } catch (error) {

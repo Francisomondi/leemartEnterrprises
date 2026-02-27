@@ -1,10 +1,11 @@
 import express from "express";
-import { createMpesaOrder, getOrderById } from "../controllers/order.controller.js";
-import { protectRoute } from "../middleware/auth.middleware.js";
+import { createMpesaOrder, getSuccessfulOrders } from "../controllers/order.controller.js";
+import { adminRoute, protectRoute } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
 router.post("/", protectRoute, createMpesaOrder);
-router.get("/orders/:id", protectRoute, getOrderById);
+//router.get("/orders/:id", protectRoute, getOrderById);
+router.get("/success", protectRoute, adminRoute, getSuccessfulOrders);
 
 export default router;

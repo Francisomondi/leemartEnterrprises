@@ -46,18 +46,16 @@ export const createMpesaOrder = async (req, res) => {
 };
 
 
-export const getOrderById = async (req, res) => {
+export const getSuccessfulOrders = async (req, res) => {
   try {
-    const order = await MpesaOrder.findById(req.params.id)
-      .populate("items.product", "name price image");
+    const orders = await MpesaOrder.find({ paymentStatus: "PAID" })
+      .populate("user", "name email")
+      .populate("items.product", "name price image")
+      .sort({ createdAt: -1 });
 
-    if (!order) {
-      return res.status(404).json({ message: "Order not found" });
-    }
-
-    res.json(order);
+    res.status(200).json(orders);
   } catch (error) {
-    console.error("GET ORDER ERROR:", error);
+    console.error("GET SUCCESSFUL ORDERS ERROR:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
