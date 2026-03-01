@@ -83,6 +83,64 @@ const AdminPage = () => {
   }));
 };
 
+
+
+const exportOrdersToCSV = () => {
+  if (!successfulOrders.length) {
+    alert("No successful orders to export.");
+    return;
+  }
+
+  const headers = [
+    "Customer Name",
+    "Customer Email",
+    "Products",
+    "Total Amount",
+    "MPESA Receipt",
+    "Date",
+  ];
+
+  const rows = successfulOrders.map((order) => {
+    const products = order.items
+      ?.map(
+        (item) =>
+          `${item.product?.name || "Unknown"} x ${item.quantity || 1}`
+      )
+      .join(" | ");
+
+    return [
+      order.user?.name || "",
+      order.user?.email || "",
+      products || "",
+      order.totalAmount || 0,
+      order.mpesaReceiptNumber || "",
+      new Date(order.createdAt).toLocaleString(),
+    ];
+  });
+
+  const csvContent =
+    [headers, ...rows]
+      .map((row) =>
+        row
+          .map((field) =>
+            `"${String(field).replace(/"/g, '""')}"`
+          )
+          .join(",")
+      )
+      .join("\n");
+
+  const blob = new Blob([csvContent], {
+    type: "text/csv;charset=utf-8;",
+  });
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", "successful-orders.csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
   return (
     <div className="min-h-screen relative overflow-hidden">
       <div className="relative z-10 container mx-auto px-4 py-16">
@@ -170,9 +228,18 @@ const AdminPage = () => {
         {/* ORDERS TAB (SUCCESSFUL ONLY) */}
         {activeTab === "orders" && (
           <div className="p-6 rounded-lg bg-gray-800 shadow">
-            <h2 className="text-2xl font-bold mb-6 text-emerald-400">
+            <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-emerald-400">
               Successful Orders
             </h2>
+
+            <button
+              onClick={exportOrdersToCSV}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-md"
+            >
+              Export CSV
+            </button>
+          </div>
 
             {successfulOrders.length === 0 ? (
               <p>No successful orders yet.</p>
@@ -230,7 +297,7 @@ const AdminPage = () => {
                         <td className="p-2 font-mono">
                           {order.mpesaReceiptNumber}
                         </td>
-                        <td className="p-2">{order._id|| "—"}</td>
+                        <td className="p-2">{order._id| "—"}</td>
                         <td className="p-2">
                           {new Date(order.createdAt).toLocaleString()}
                         </td>
