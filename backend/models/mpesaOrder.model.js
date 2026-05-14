@@ -56,6 +56,11 @@ const mpesaOrderSchema = new mongoose.Schema(
     paymentReference: {
       type: String,
     },
+     deliveryDetails: {
+      location: String,
+      deliveryFee: Number,
+      phoneNumber: String,
+    },
 
     mpesaTransaction: {
       type: mongoose.Schema.Types.ObjectId,
