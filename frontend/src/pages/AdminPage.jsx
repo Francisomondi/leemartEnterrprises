@@ -38,7 +38,11 @@ const AdminPage = () => {
         withCredentials: true,
       });
 
-      setTransactions(res.data.transactions || []);
+      setTransactions(
+        Array.isArray(res.data.transactions)
+          ? res.data.transactions
+          : []
+      );
     } catch (error) {
       console.error("Failed to fetch MPESA transactions:", error);
     } finally {
@@ -61,19 +65,35 @@ const AdminPage = () => {
    */
 
 
-  const fetchSuccessfulOrders = async () => {
-  try {
-    const res = await axiosInstance.get("/orders/success", {
-      withCredentials: true,
-    });
+    const fetchSuccessfulOrders = async () => {
+      try {
+        setOrdersLoading(true);
 
-    setSuccessfulOrders(res.data || []);
-  } catch (error) {
-    console.error("Failed to fetch orders:", error);
-  } finally {
-    setOrdersLoading(false);
-  }
-};
+        const res = await axiosInstance.get(
+          "/orders/success",
+          {
+            withCredentials: true,
+          }
+        );
+
+        console.log("ORDERS RESPONSE:", res.data);
+
+        // SAFE ARRAY HANDLING
+        if (Array.isArray(res.data)) {
+          setSuccessfulOrders(res.data);
+        } else if (Array.isArray(res.data.orders)) {
+          setSuccessfulOrders(res.data.orders);
+        } else {
+          setSuccessfulOrders([]);
+        }
+
+      } catch (error) {
+        console.error("Failed to fetch orders:", error);
+        setSuccessfulOrders([]);
+      } finally {
+        setOrdersLoading(false);
+      }
+    };
   const getOrderProducts = (order) => {
   if (!order?.items) return [];
 
