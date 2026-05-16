@@ -134,6 +134,7 @@ const exportOrdersToCSV = () => {
       products || "",
       order.totalAmount || 0,
       order.mpesaReceiptNumber || "",
+      order._id || "",
       new Date(order.createdAt).toLocaleString(),
     ];
   });
@@ -317,7 +318,7 @@ const exportOrdersToCSV = () => {
                         <td className="p-2 font-mono">
                           {order.mpesaReceiptNumber}
                         </td>
-                        <td className="p-2">{order._id| "—"}</td>
+                        <td className="p-2">{order._id|| "—"}</td>
                         <td className="p-2">
                           {new Date(order.createdAt).toLocaleString()}
                         </td>
