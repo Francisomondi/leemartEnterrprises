@@ -1,243 +1,274 @@
 import {
-	ShoppingCart,
-	UserPlus,
-	LogIn,
-	LogOut,
-	Lock,
-	Menu,
-	X,
+  ShoppingCart,
+  UserPlus,
+  LogIn,
+  LogOut,
+  Lock,
+  Menu,
+  X,
 } from "lucide-react";
+
 import { Link } from "react-router-dom";
 import { useUserStore } from "../stores/useUserStore";
 import { useCartStore } from "../stores/useCartStore";
 import { useState } from "react";
 
 const Navbar = () => {
-	const { user, logout } = useUserStore();
-	const isAdmin = user?.role === "admin";
-	const { cart } = useCartStore();
-	const [open, setOpen] = useState(false);
+  const { user, logout } = useUserStore();
+  const { cart = [] } = useCartStore();
 
-	return (
-		<header className='fixed top-0 left-0 w-full bg-gray-900 bg-opacity-90 backdrop-blur-md shadow-lg z-40 transition-all duration-300 border-b border-emerald-800'>
-			<div className='container mx-auto px-3 py-2'>
-				<div className='flex justify-between items-center'>
+  const [open, setOpen] = useState(false);
 
-					{/* Logo */}
-					<Link
-						to='/'
-						className='text-2xl font-bold text-emerald-900 flex items-center'
-					>
-						<img src='/logo.png' alt='Leemart Logo' className="h-12 md:h-16 w-auto object-contain"/>
-					</Link>
+  const isAdmin = user?.role === "admin";
 
-					{/* Desktop Nav */}
-					<nav className='hidden md:flex items-center gap-4'>
-						<Link to='/' className='text-gray-300 hover:text-emerald-400 transition duration-300'>
-							Home
-						</Link>
-						<Link to='/about' className='text-gray-300 hover:text-emerald-400 transition duration-300'>
-							About
-						</Link>
-						<Link to='/contact' className='text-gray-300 hover:text-emerald-400 transition duration-300'>
-							Contact
-						</Link>
+  const closeMenu = () => setOpen(false);
 
-						{user && (
-							<Link
-								to='/cart'
-								className='relative group text-gray-300 hover:text-emerald-400 transition duration-300'
-							>
-								<ShoppingCart size={20} />
-								{cart.length > 0 && (
-									<span className='absolute -top-2 -left-2 bg-emerald-500 text-white rounded-full px-2 py-0.5 text-xs'>
-										{cart.length}
-									</span>
-								)}
-							</Link>
-						)}
+  const handleLogout = () => {
+    logout();
+    closeMenu();
+  };
 
-						{isAdmin && (
-							<Link
-								to='/secret-dashboard'
-								className='bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1 rounded-md flex items-center transition'
-							>
-								<Lock size={18} className='mr-1' />
-								Dashboard
-							</Link>
-						)}
+  return (
+    <header className="fixed top-0 left-0 z-50 w-full border-b border-emerald-900/40 bg-gray-900/95 backdrop-blur-md shadow-lg">
+      <div className="container mx-auto px-4">
+        <div className="flex h-16 items-center justify-between">
+          {/* LOGO */}
+          <Link
+            to="/"
+            className="flex items-center flex-shrink-0"
+          >
+            <img
+              src="/logo.png"
+              alt="Leemart Logo"
+              className="h-11 w-auto object-contain md:h-14"
+              loading="lazy"
+            />
+          </Link>
 
-						
+          {/* DESKTOP NAV */}
+          <nav className="hidden items-center gap-5 md:flex">
+            <Link
+              to="/"
+              className="text-sm text-gray-300 transition hover:text-emerald-400"
+            >
+              Home
+            </Link>
 
-						{user ? (
-							<button
-								onClick={logout}
-								className='bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-md flex items-center transition'
-							>
-								<LogOut size={18} />
-								<span className='ml-2 hidden sm:inline'>Log Out</span>
-							</button>
-						) : (
-							<>
-								<Link
-									to='/signup'
-									className='bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-4 rounded-md flex items-center transition'
-								>
-									<UserPlus size={18} className='mr-2' />
-									Sign Up
-								</Link>
-								<Link
-									to='/login'
-									className='bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-md flex items-center transition'
-								>
-									<LogIn size={18} className='mr-2' />
-									Login
-								</Link>
-							</>
-						)}
+            <Link
+              to="/about"
+              className="text-sm text-gray-300 transition hover:text-emerald-400"
+            >
+              About
+            </Link>
 
-						{user && (
-							<Link
-								to="/profile"
-								className="
-								flex items-center gap-2 sm:gap-3
-								px-1 sm:px-2 py-1
-								rounded-lg hover:bg-gray-800 transition
-								flex-shrink-0
-								"
-							>
-								<img
-								src={user.avatar || "/default-avatar.png"}
-								alt={user.name || "User avatar"}
-								className="
-									w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11
-									rounded-full object-cover
-									border-2 border-emerald-500
-									hover:ring-2 hover:ring-emerald-400
-									transition
-								"
-								/>
+            <Link
+              to="/contact"
+              className="text-sm text-gray-300 transition hover:text-emerald-400"
+            >
+              Contact
+            </Link>
+			
 
-								{/* Hide text on small screens to avoid crowding */}
-								<div className="hidden md:flex flex-col leading-tight max-w-[140px]">
-								<span className="text-sm font-semibold text-white truncate">
-									{user.name}
-								</span>
-								<span className="text-xs text-gray-400">
-									My Profile
-								</span>
-								</div>
-							</Link>
-						)}
+            {/* CART */}
+            {user && (
+              <Link
+                to="/cart"
+                className="relative text-gray-300 transition hover:text-emerald-400"
+              >
+                <ShoppingCart size={22} />
 
-					</nav>
+                {cart.length > 0 && (
+                  <span className="absolute -left-2 -top-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-500 px-1 text-xs font-bold text-white">
+                    {cart.length}
+                  </span>
+                )}
+              </Link>
+            )}
 
-					{/* Mobile Menu Button */}
-					<button
-						onClick={() => setOpen(!open)}
-						className='md:hidden text-gray-300'
-					>
-						{open ? <X size={26} /> : <Menu size={26} />}
-					</button>
-				</div>
+            {/* ADMIN */}
+            {isAdmin && (
+              <Link
+                to="/secret-dashboard"
+                className="flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
+              >
+                <Lock size={16} />
+                Dashboard
+              </Link>
+            )}
 
-				{/* Mobile Menu */}
-				{open && (
-					<div className='md:hidden mt-4 space-y-3'>
+            {/* AUTH */}
+            {user ? (
+              <>
+                {/* PROFILE */}
+                <Link
+                  to="/profile"
+                  className="flex items-center gap-3 rounded-lg px-2 py-1 transition hover:bg-gray-800"
+                >
+                  <img
+                    src={user.avatar || "/default-avatar.png"}
+                    alt={user.name || "User"}
+                    className="h-10 w-10 rounded-full border-2 border-emerald-500 object-cover"
+                  />
 
-						{user && (
-						<Link
-							to="/profile"
-							onClick={() => setOpen(false)}
-							className="
-							flex items-center gap-4
-							p-3 rounded-lg
-							bg-gray-800 hover:bg-gray-700
-							transition
-							"
-						>
-							<img
-							src={user.avatar || "/default-avatar.png"}
-							alt={user.name || "User avatar"}
-							className="
-								w-12 h-12
-								rounded-full object-cover
-								border-2 border-emerald-500
-							"
-						/>
+                  <div className="hidden max-w-[140px] flex-col md:flex">
+                    <span className="truncate text-sm font-semibold text-white">
+                      {user.name}
+                    </span>
 
-							<div className="flex flex-col leading-tight">
-							<span className="text-base font-semibold text-white">
-								{user.name}
-							</span>
-							<span className="text-sm text-gray-400">
-								View Profile
-							</span>
-							</div>
-						</Link>
-						)}
+                    <span className="text-xs text-gray-400">
+                      My Profile
+                    </span>
+                  </div>
+                </Link>
 
-						<Link onClick={() => setOpen(false)} to='/' className='block text-gray-300 hover:text-emerald-400'>
-							Home
-						</Link>
-						<Link onClick={() => setOpen(false)} to='/about' className='block text-gray-300 hover:text-emerald-400'>
-							About
-						</Link>
-						<Link onClick={() => setOpen(false)} to='/contact' className='block text-gray-300 hover:text-emerald-400'>
-							Contact
-						</Link>
+                {/* LOGOUT */}
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 rounded-md bg-gray-700 px-4 py-2 text-sm text-white transition hover:bg-gray-600"
+                >
+                  <LogOut size={18} />
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/signup"
+                  className="flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm text-white transition hover:bg-emerald-700"
+                >
+                  <UserPlus size={18} />
+                  Sign Up
+                </Link>
 
-						{user && (
-							<Link
-								onClick={() => setOpen(false)}
-								to='/cart'
-								className='flex items-center gap-2 text-gray-300 hover:text-emerald-400'
-							>
-								<ShoppingCart size={18} />
-								Cart ({cart.length})
-							</Link>
-						)}
+                <Link
+                  to="/login"
+                  className="flex items-center gap-2 rounded-md bg-gray-700 px-4 py-2 text-sm text-white transition hover:bg-gray-600"
+                >
+                  <LogIn size={18} />
+                  Login
+                </Link>
+              </>
+            )}
+          </nav>
 
-						{isAdmin && (
-							<Link
-								onClick={() => setOpen(false)}
-								to='/secret-dashboard'
-								className='block bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-2 rounded-md'
-							>
-								Admin Dashboard
-							</Link>
-						)}
+          {/* MOBILE MENU BUTTON */}
+          <button
+            onClick={() => setOpen(!open)}
+            className="text-gray-300 transition hover:text-white md:hidden"
+            aria-label="Toggle Menu"
+          >
+            {open ? <X size={28} /> : <Menu size={28} />}
+          </button>
+        </div>
 
-						{user ? (
-							<button
-								onClick={logout}
-								className='w-full bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-md'
-							>
-								Log Out
-							</button>
-						) : (
-							<>
-								<Link
-									onClick={() => setOpen(false)}
-									to='/signup'
-									className='block bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-md text-center'
-								>
-									Sign Up
-								</Link>
-								<Link
-									onClick={() => setOpen(false)}
-									to='/login'
-									className='block bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-md text-center'
-								>
-									Login
-								</Link>
-							</>
-						)}
-					</div>
-				)}
-			</div>
-		</header>
-	);
+        {/* MOBILE MENU */}
+        {open && (
+          <div className="space-y-3 border-t border-gray-800 py-4 md:hidden">
+            {/* MOBILE PROFILE */}
+            {user && (
+              <Link
+                to="/profile"
+                onClick={closeMenu}
+                className="flex items-center gap-4 rounded-xl bg-gray-800 p-3 transition hover:bg-gray-700"
+              >
+                <img
+                  src={user.avatar || "/default-avatar.png"}
+                  alt={user.name || "User"}
+                  className="h-12 w-12 rounded-full border-2 border-emerald-500 object-cover"
+                />
+
+                <div>
+                  <p className="font-semibold text-white">
+                    {user.name}
+                  </p>
+
+                  <p className="text-sm text-gray-400">
+                    View Profile
+                  </p>
+                </div>
+              </Link>
+            )}
+
+            {/* LINKS */}
+            <Link
+              to="/"
+              onClick={closeMenu}
+              className="block text-gray-300 transition hover:text-emerald-400"
+            >
+              Home
+            </Link>
+
+            <Link
+              to="/about"
+              onClick={closeMenu}
+              className="block text-gray-300 transition hover:text-emerald-400"
+            >
+              About
+            </Link>
+
+            <Link
+              to="/contact"
+              onClick={closeMenu}
+              className="block text-gray-300 transition hover:text-emerald-400"
+            >
+              Contact
+            </Link>
+
+            {/* CART */}
+            {user && (
+              <Link
+                to="/cart"
+                onClick={closeMenu}
+                className="flex items-center gap-2 text-gray-300 transition hover:text-emerald-400"
+              >
+                <ShoppingCart size={18} />
+                Cart ({cart.length})
+              </Link>
+            )}
+
+            {/* ADMIN */}
+            {isAdmin && (
+              <Link
+                to="/secret-dashboard"
+                onClick={closeMenu}
+                className="block rounded-md bg-emerald-600 px-4 py-2 text-center text-white transition hover:bg-emerald-700"
+              >
+                Admin Dashboard
+              </Link>
+            )}
+
+            {/* AUTH */}
+            {user ? (
+              <button
+                onClick={handleLogout}
+                className="w-full rounded-md bg-gray-700 py-2 text-white transition hover:bg-gray-600"
+              >
+                Log Out
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <Link
+                  to="/signup"
+                  onClick={closeMenu}
+                  className="block rounded-md bg-emerald-600 py-2 text-center text-white transition hover:bg-emerald-700"
+                >
+                  Sign Up
+                </Link>
+
+                <Link
+                  to="/login"
+                  onClick={closeMenu}
+                  className="block rounded-md bg-gray-700 py-2 text-center text-white transition hover:bg-gray-600"
+                >
+                  Login
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </header>
+  );
 };
 
 export default Navbar;

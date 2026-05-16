@@ -27,7 +27,7 @@ const ProfilePage = () => {
         name: user.name ?? "",
         phone: user.phone ?? "",
       });
-     // fetchOrders();
+      fetchOrders();
       fetchTransactions();
     }
   }, [user]);
@@ -81,14 +81,37 @@ const ProfilePage = () => {
     }
   };
 
-  //const fetchOrders = async () => {
-   // try {
-   //   const res = await axiosInstance.get("/orders/my");
-   //   setOrders(res.data);
-   //// } catch {
-   //   setOrders([]);
-   // }
- // };
+ const fetchOrders = async () => {
+  try {
+
+    const res = await axiosInstance.get(
+      "/orders/my-orders",
+      {
+        withCredentials: true,
+      }
+    );
+
+    console.log(res.data.orders);
+
+    // ONLY SUCCESSFUL / PAID ORDERS
+    const successfulOrders =
+      res.data.orders.filter(
+        (order) =>
+          order.paymentStatus === "paid" ||
+          order.isPaid === true ||
+          order.status === "success"
+      );
+
+    setOrders(successfulOrders);
+
+  } catch (error) {
+
+    console.error(
+      "Failed to fetch orders:",
+      error
+    );
+  }
+};
 
 const fetchTransactions = async () => {
   try {
@@ -193,29 +216,86 @@ const fetchTransactions = async () => {
       </div>
 
       {/* Recent Orders */}
-      <div className="bg-gray-900 shadow rounded-lg p-6 md:p-10">
-        <h2 className="text-xl font-bold text-emerald-400 mb-4">Recent Orders</h2>
-        {orders.length === 0 ? (
-          <p className="text-gray-400">No orders yet.</p>
-        ) : (
-          <div className="space-y-3">
-            {orders.slice(0, 5).map((order) => (
-              <div
-                key={order._id}
-                className="bg-gray-800 p-3 rounded flex justify-between items-center"
-              >
-                <span>Order #{order._id.slice(-6)}</span>
-                <span className="text-emerald-400 font-semibold">
-                  KES {order.total}
-                </span>
-                <span className="text-gray-400 text-sm">
-                  {format(new Date(order.createdAt), "PPP")}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+  <div className="bg-gray-900 shadow rounded-2xl p-6 md:p-10 border border-gray-800">
+	
+    {/* HEADER */}
+    <div className="flex items-center justify-between mb-6">
+      <div>
+        <h2 className="text-2xl font-bold text-emerald-400">
+          Recent Orders
+        </h2>
+
+        <p className="text-sm text-gray-400 mt-1">
+          Your latest purchases
+        </p>
       </div>
+
+      {orders.length > 0 && (
+        <button className="text-sm text-emerald-400 hover:text-emerald-300 transition">
+          View All
+        </button>
+      )}
+    </div>
+
+	{/* EMPTY STATE */}
+	{orders.length === 0 ? (
+
+		<div className="flex flex-col items-center justify-center py-12 text-center">
+			<div className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center mb-4">
+				📦
+			</div>
+
+			<p className="text-gray-300 font-medium">
+				No orders yet
+			</p>
+
+			<p className="text-gray-500 text-sm mt-1">
+				Your recent purchases will appear here.
+			</p>
+		</div>
+
+	) : (
+
+		<div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
+
+			{orders.slice(0, 5).map((order) => (
+
+				<div
+					key={order._id}
+					className="bg-gray-800/70 border border-gray-700 hover:border-emerald-500/40 transition rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+				>
+
+					{/* LEFT */}
+					<div className="space-y-1">
+						<p className="font-semibold text-white">
+							Order #{order._id.slice(-6)}
+						</p>
+
+						<p className="text-sm text-gray-400">
+							{format(
+								new Date(order.createdAt),
+								"PPP"
+							)}
+						</p>
+					</div>
+
+					{/* CENTER */}
+					<div className="flex items-center gap-3">
+
+						<span className="px-3 py-1 rounded-full text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+							Paid
+						</span>
+
+						<p className="text-lg font-bold text-emerald-400">
+							KES {order.total}
+						</p>
+					</div>
+
+				</div>
+			))}
+		</div>
+	)}
+  </div>
 
       {/* Recent MPESA Transactions */}
       <div className="bg-gray-900 shadow rounded-lg p-6 md:p-10">
