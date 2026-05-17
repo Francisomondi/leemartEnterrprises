@@ -42,7 +42,7 @@ export const getSuccessfulOrders = async (req, res) => {
       paymentStatus: "PAID",
       
     })
-      .populate("user", "name email")
+      .populate("user", "name email phone")
       .populate("items.product", "name price image")
       .sort({ createdAt: -1 });
 

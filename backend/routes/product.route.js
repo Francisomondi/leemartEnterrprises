@@ -16,7 +16,7 @@ import { upload } from "../middleware/multer.js";
 
 const router = express.Router();
 
-router.get("/", protectRoute, adminRoute, getAllProducts);
+router.get("/", getAllProducts);
 router.get("/products", getAllProducts);
 router.get("/featured", getFeaturedProducts);
 

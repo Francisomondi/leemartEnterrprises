@@ -14,6 +14,7 @@ import ProductsList from "../components/ProductsList";
 import MpesaAnalyticsTab from "../components/MpesaAnalyticsTab";
 import { useProductStore } from "../stores/useProductStore";
 import axiosInstance from "../lib/axios";
+import { useUserStore } from "../stores/useUserStore";
 
 const tabs = [
   { id: "create", label: "Create Product", icon: PlusCircle },
@@ -31,6 +32,8 @@ const AdminPage = () => {
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
+   const { user} = useUserStore();
+    const [form, setForm] = useState({ name: "", phone: "" });
 
   const fetchAllMpesaTransactions = async () => {
     try {
@@ -51,10 +54,16 @@ const AdminPage = () => {
   };
 
   useEffect(() => {
+    if (user) {
+      setForm({
+        name: user.name ?? "",
+        phone: user.phone ?? "",
+      });
+    }
     fetchAllProducts();
     fetchAllMpesaTransactions();
     fetchSuccessfulOrders()
-  }, [fetchAllProducts]);
+  }, [fetchAllProducts, user]);
 
   /**
    * ONLY SUCCESSFUL ORDERS
@@ -100,6 +109,7 @@ const AdminPage = () => {
   return order.items.map((item) => ({
     name: item.product?.name,
     quantity: item.quantity || 1,
+    phone: order.user?.phone || "—",
   }));
 };
 
@@ -134,6 +144,7 @@ const exportOrdersToCSV = () => {
       products || "",
       order.totalAmount || 0,
       order.mpesaReceiptNumber || "",
+      order.user?.phone || "",
       order._id || "",
       new Date(order.createdAt).toLocaleString(),
     ];
@@ -273,6 +284,7 @@ const exportOrdersToCSV = () => {
                     <th className="p-2">Amount</th>
                     <th className="p-2">Receipt</th>
                     <th className="p-2">Order ID</th>
+                     <th className="p-2">Phone</th>
                     <th className="p-2">Date</th>
                   </tr>
                 </thead>
@@ -319,6 +331,7 @@ const exportOrdersToCSV = () => {
                           {order.mpesaReceiptNumber}
                         </td>
                         <td className="p-2">{order._id|| "—"}</td>
+                        <td className="p-2">{order.user?.phone || "—"}</td>
                         <td className="p-2">
                           {new Date(order.createdAt).toLocaleString()}
                         </td>

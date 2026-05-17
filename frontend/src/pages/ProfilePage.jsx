@@ -268,7 +268,7 @@ const fetchTransactions = async () => {
 					{/* LEFT */}
 					<div className="space-y-1">
 						<p className="font-semibold text-white">
-							Order #{order._id.slice(-6)}
+							Order #{order._id}
 						</p>
 
 						<p className="text-sm text-gray-400">
@@ -285,9 +285,12 @@ const fetchTransactions = async () => {
 						<span className="px-3 py-1 rounded-full text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
 							Paid
 						</span>
+            <span className="px-3 py-1 rounded-full text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+							{user.phone}
+						</span>
 
 						<p className="text-lg font-bold text-emerald-400">
-							KES {order.total}
+							KES {order.totalAmount.toLocaleString()}
 						</p>
 					</div>
 

@@ -3,6 +3,7 @@ import axios from "../lib/axios";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
+import axiosInstance from "../lib/axios";
 
 
 const AllProducts = () => {
@@ -14,7 +15,7 @@ const AllProducts = () => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        const { data } = await axios.get("/products");
+        const { data } = await axiosInstance.get("/products");
         setProducts(data.products || []);
       } catch (err) {
         console.error(err);
