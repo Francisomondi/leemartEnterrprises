@@ -21,6 +21,7 @@ const ProfilePage = () => {
     fetchProfile();
   }, []);
 
+
   useEffect(() => {
     if (user) {
       setForm({
@@ -290,7 +291,7 @@ const fetchTransactions = async () => {
 						</span>
 
 						<p className="text-lg font-bold text-emerald-400">
-							KES {order.totalAmount.toLocaleString()}
+							KES {order.totalAmount}
 						</p>
 					</div>
 

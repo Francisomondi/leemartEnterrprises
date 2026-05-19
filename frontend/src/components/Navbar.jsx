@@ -6,20 +6,33 @@ import {
   Lock,
   Menu,
   X,
+  Search,
 } from "lucide-react";
 
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useUserStore } from "../stores/useUserStore";
 import { useCartStore } from "../stores/useCartStore";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useProductStore } from "../stores/useProductStore";
 
 const Navbar = () => {
   const { user, logout } = useUserStore();
   const { cart = [] } = useCartStore();
+  const { products = [], fetchAllProducts } = useProductStore();
 
   const [open, setOpen] = useState(false);
 
+  // SEARCH
+  const [search, setSearch] = useState("");
+  const [showResults, setShowResults] = useState(false);
+
+  const navigate = useNavigate();
+
   const isAdmin = user?.role === "admin";
+
+  useEffect(() => {
+    fetchAllProducts();
+  }, [fetchAllProducts]);
 
   const closeMenu = () => setOpen(false);
 
@@ -28,10 +41,37 @@ const Navbar = () => {
     closeMenu();
   };
 
+  // FILTER PRODUCTS + CATEGORIES
+  const filteredResults = useMemo(() => {
+    if (!search.trim()) return [];
+
+    const query = search.toLowerCase();
+
+    return products.filter((product) => {
+      const nameMatch = product?.name
+        ?.toLowerCase()
+        .includes(query);
+
+      const categoryMatch = product?.category
+        ?.toLowerCase()
+        .includes(query);
+
+      return nameMatch || categoryMatch;
+    });
+  }, [search, products]);
+
+  const handleSearchSelect = (product) => {
+    setSearch("");
+    setShowResults(false);
+    closeMenu();
+
+    navigate(`/product/${product._id}`);
+  };
+
   return (
     <header className="fixed top-0 left-0 z-50 w-full border-b border-emerald-900/40 bg-gray-900/95 backdrop-blur-md shadow-lg">
       <div className="container mx-auto px-4">
-        <div className="flex h-16 items-center justify-between">
+        <div className="flex h-auto min-h-16 flex-wrap items-center justify-between gap-3 py-2 md:h-16 md:flex-nowrap md:py-0">
           {/* LOGO */}
           <Link
             to="/"
@@ -44,6 +84,71 @@ const Navbar = () => {
               loading="lazy"
             />
           </Link>
+
+          {/* SEARCH BAR */}
+          <div className="relative order-3 w-full md:order-none md:mx-6 md:max-w-xl">
+            <div className="flex items-center rounded-xl border border-gray-700 bg-gray-800 px-3 py-2 focus-within:border-emerald-500">
+              <Search
+                size={18}
+                className="mr-2 text-gray-400"
+              />
+
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setShowResults(true);
+                }}
+                onFocus={() => setShowResults(true)}
+                placeholder="Search products or categories..."
+                className="w-full bg-transparent text-sm text-white outline-none placeholder:text-gray-400"
+              />
+            </div>
+
+            {/* SEARCH RESULTS */}
+            {showResults && search.trim() && (
+              <div className="absolute left-0 right-0 top-full mt-2 max-h-80 overflow-y-auto rounded-xl border border-gray-700 bg-gray-900 shadow-2xl">
+                {filteredResults.length > 0 ? (
+                  filteredResults.slice(0, 8).map((product) => (
+                    <button
+                      key={product._id}
+                      onClick={() =>
+                        handleSearchSelect(product)
+                      }
+                      className="flex w-full items-center gap-3 border-b border-gray-800 px-4 py-3 text-left transition hover:bg-gray-800"
+                    >
+                      <img
+                        src={
+                          product.images?.[0] || "/placeholder.png"
+                        }
+                        alt={product.name}
+                        className="h-12 w-12 rounded-md object-cover"
+                      />
+
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-white">
+                          {product.name}
+                        </p>
+
+                        <p className="text-xs text-emerald-400">
+                          {product.category}
+                        </p>
+                      </div>
+
+                      <p className="text-sm font-semibold text-white">
+                        KES {product.price}
+                      </p>
+                    </button>
+                  ))
+                ) : (
+                  <div className="px-4 py-6 text-center text-sm text-gray-400">
+                    No products found
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* DESKTOP NAV */}
           <nav className="hidden items-center gap-5 md:flex">
@@ -67,7 +172,6 @@ const Navbar = () => {
             >
               Contact
             </Link>
-			
 
             {/* CART */}
             {user && (
@@ -105,7 +209,10 @@ const Navbar = () => {
                   className="flex items-center gap-3 rounded-lg px-2 py-1 transition hover:bg-gray-800"
                 >
                   <img
-                    src={user.avatar || "/default-avatar.png"}
+                    src={
+                      user.avatar ||
+                      "/default-avatar.png"
+                    }
                     alt={user.name || "User"}
                     className="h-10 w-10 rounded-full border-2 border-emerald-500 object-cover"
                   />
@@ -172,7 +279,10 @@ const Navbar = () => {
                 className="flex items-center gap-4 rounded-xl bg-gray-800 p-3 transition hover:bg-gray-700"
               >
                 <img
-                  src={user.avatar || "/default-avatar.png"}
+                  src={
+                    user.avatar ||
+                    "/default-avatar.png"
+                  }
                   alt={user.name || "User"}
                   className="h-12 w-12 rounded-full border-2 border-emerald-500 object-cover"
                 />
