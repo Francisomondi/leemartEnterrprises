@@ -208,7 +208,7 @@ export const mpesaCallback = async (req, res) => {
     }
 
     const {
-      merchantRequestID,
+      MerchantRequestID,
       CheckoutRequestID,
       ResultCode,
       ResultDesc,
@@ -241,7 +241,7 @@ export const mpesaCallback = async (req, res) => {
         transaction.resultCode = ResultCode;
          transaction.resultDesc = ResultDesc;
       }
-     
+     await transaction.save();
       
 
       return res.json({ ResultCode: 0, ResultDesc: "Callback processed" });
