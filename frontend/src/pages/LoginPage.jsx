@@ -3,12 +3,36 @@ import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { LogIn, Mail, Lock, ArrowRight, Loader } from "lucide-react";
 import { useUserStore } from "../stores/useUserStore";
+import { GoogleLogin } from "@react-oauth/google";
+import toast from "react-hot-toast";
 
 const LoginPage = () => {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 
-	const { login, loading } = useUserStore();
+	const { login, googleLogin, loading } = useUserStore();
+
+	const handleGoogleSuccess = async (
+		credentialResponse
+		) => {
+		try {
+			if (!credentialResponse.credential) {
+			toast.error(
+				"Google did not return a credential"
+			);
+			return;
+			}
+
+			await googleLogin(
+			credentialResponse.credential
+			);
+		} catch (error) {
+			console.error(
+			"Google authentication failed:",
+			error
+			);
+		}
+		};
 
 	const handleSubmit = (e) => {
 		e.preventDefault();
@@ -100,6 +124,29 @@ const LoginPage = () => {
 							)}
 						</button>
 					</form>
+
+					<div className="my-6 flex items-center">
+					<div className="flex-1 border-t border-gray-600" />
+
+					<span className="px-4 text-sm text-gray-400">
+						OR
+					</span>
+
+					<div className="flex-1 border-t border-gray-600" />
+					</div>
+
+					<div className="flex justify-center">
+					<GoogleLogin
+						onSuccess={handleGoogleSuccess}
+						onError={() =>
+						toast.error("Google login failed")
+						}
+						theme="filled_black"
+						size="large"
+						shape="rectangular"
+						text="continue_with"
+					/>
+					</div>
 
 					<p className='mt-8 text-center text-sm text-gray-400'>
 						Not a member?{" "}

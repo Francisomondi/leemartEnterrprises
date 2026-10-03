@@ -36,6 +36,46 @@ export const useUserStore = create((set, get) => ({
 		}
 	},
 
+	googleLogin: async (credential) => {
+  try {
+    set({ loading: true });
+
+    const res = await axios.post(
+      "/auth/google",
+      {
+        credential,
+      }
+    );
+
+    set({
+      user: res.data,
+      loading: false,
+    });
+
+    toast.success(
+      `Welcome ${res.data.name}`
+    );
+
+    return res.data;
+  } catch (error) {
+    console.error(
+      "Google login error:",
+      error.response?.data || error.message
+    );
+
+    set({
+      loading: false,
+    });
+
+    toast.error(
+      error.response?.data?.message ||
+        "Google authentication failed"
+    );
+
+    throw error;
+  }
+},
+
 	logout: async () => {
 		try {
 			await axios.post("/auth/logout");

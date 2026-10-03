@@ -2,6 +2,149 @@ import { redis } from "../lib/redis.js";
 import User from "../models/user.model.js";
 import jwt from "jsonwebtoken";
 import cloudinary from "../lib/cloudinary.js";
+import { OAuth2Client } from "google-auth-library";
+
+
+const googleClient = new OAuth2Client(
+  process.env.GOOGLE_CLIENT_ID
+);
+
+export const googleAuth = async (req, res) => {
+  try {
+    const { credential } = req.body;
+
+    if (!credential) {
+      return res.status(400).json({
+        message: "Google credential is required",
+      });
+    }
+
+    /* ==========================================
+       VERIFY GOOGLE TOKEN
+    ========================================== */
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+
+    if (!payload) {
+      return res.status(401).json({
+        message: "Invalid Google account",
+      });
+    }
+
+    const {
+      sub: googleId,
+      email,
+      name,
+      picture,
+      email_verified: emailVerified,
+    } = payload;
+
+    if (!email || !emailVerified) {
+      return res.status(401).json({
+        message: "Google email is not verified",
+      });
+    }
+
+    const normalizedEmail = email
+      .toLowerCase()
+      .trim();
+
+    /* ==========================================
+       FIND EXISTING USER
+    ========================================== */
+
+    let user = await User.findOne({
+      email: normalizedEmail,
+    });
+
+    if (user) {
+      /*
+       * Existing Leemart customer.
+       *
+       * Link Google to the existing account instead
+       * of creating a duplicate account.
+       */
+
+      if (!user.googleId) {
+        user.googleId = googleId;
+      }
+
+      if (!user.avatar && picture) {
+        user.avatar = picture;
+      }
+
+      await user.save();
+    } else {
+      /* ==========================================
+         CREATE NEW GOOGLE USER
+      ========================================== */
+
+      user = await User.create({
+        name: name || normalizedEmail.split("@")[0],
+
+        email: normalizedEmail,
+
+        phone: "",
+
+        password: null,
+
+        googleId,
+
+        authProvider: "google",
+
+        avatar: picture || "",
+      });
+    }
+
+    /* ==========================================
+       CREATE LEEMART JWT SESSION
+    ========================================== */
+
+    const {
+      accessToken,
+      refreshToken,
+    } = generateTokens(user._id);
+
+    await storeRefreshToken(
+      user._id,
+      refreshToken
+    );
+
+    setCookies(
+      res,
+      accessToken,
+      refreshToken
+    );
+
+    /* ==========================================
+       RESPONSE
+    ========================================== */
+
+    return res.status(200).json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      avatar: user.avatar,
+      role: user.role,
+      authProvider: user.authProvider,
+    });
+  } catch (error) {
+    console.error(
+      "Google authentication error:",
+      error.message
+    );
+
+    return res.status(401).json({
+      message: "Google authentication failed",
+    });
+  }
+};
 
 const generateTokens = (userId) => {
 	const accessToken = jwt.sign({ userId }, process.env.ACCESS_TOKEN_SECRET, {
@@ -169,8 +312,8 @@ else if (!/^254(7|1)\d{8}$/.test(formattedPhone)) {
 
   const user = await User.findByIdAndUpdate(
     req.user._id,
-    { name, phone },
-    { new: true }
+    { name, phone: formattedPhone, },
+    { new: true, runValidators: true, }
   );
 
   res.json(user);

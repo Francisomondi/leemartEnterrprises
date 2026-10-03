@@ -11,6 +11,7 @@
 	},
 	"dependencies": {
 		"@emailjs/browser": "^4.4.1",
+		"@react-oauth/google": "^0.13.5",
 		"@stripe/stripe-js": "^4.3.0",
 		"axios": "^1.7.5",
 		"body-parser": "^2.2.1",

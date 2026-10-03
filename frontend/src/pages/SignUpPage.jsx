@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { UserPlus, Mail, Lock, User, ArrowRight, Loader } from "lucide-react";
 import { motion } from "framer-motion";
 import { useUserStore } from "../stores/useUserStore";
+import { GoogleLogin } from "@react-oauth/google";
+import toast from "react-hot-toast";
 
 const SignUpPage = () => {
 	const [formData, setFormData] = useState({
@@ -13,7 +15,29 @@ const SignUpPage = () => {
 		confirmPassword: "",
 	});
 
-	const { signup, loading } = useUserStore();
+	const { signup, googleLogin, loading } = useUserStore();
+
+	const handleGoogleSuccess = async (
+	credentialResponse
+	) => {
+	try {
+		if (!credentialResponse.credential) {
+		toast.error(
+			"Google did not return a credential"
+		);
+		return;
+		}
+
+		await googleLogin(
+		credentialResponse.credential
+		);
+	} catch (error) {
+		console.error(
+		"Google signup failed:",
+		error
+		);
+	}
+	};
 
 	const handleSubmit = async (e) => {
 		e.preventDefault();
@@ -176,6 +200,28 @@ const SignUpPage = () => {
 							)}
 						</button>
 					</form>
+					<div className="my-6 flex items-center">
+					<div className="flex-1 border-t border-gray-600" />
+
+					<span className="px-4 text-sm text-gray-400">
+						OR
+					</span>
+
+					<div className="flex-1 border-t border-gray-600" />
+					</div>
+
+					<div className="flex justify-center">
+					<GoogleLogin
+						onSuccess={handleGoogleSuccess}
+						onError={() =>
+						toast.error("Google signup failed")
+						}
+						theme="filled_black"
+						size="large"
+						shape="rectangular"
+						text="signup_with"
+					/>
+					</div>
 
 					<p className='mt-8 text-center text-sm text-gray-400'>
 						Already have an account?{" "}
