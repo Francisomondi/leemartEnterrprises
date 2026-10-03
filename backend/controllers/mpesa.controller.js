@@ -18,24 +18,74 @@ const consumerSecret = process.env.MPESA_CONSUMER_SECRET
 
 export const generateToken = async (req, res, next) => {
   try {
+    const consumerKey = process.env.MPESA_CONSUMER_KEY;
+    const consumerSecret = process.env.MPESA_CONSUMER_SECRET;
+
+    if (!consumerKey || !consumerSecret) {
+      console.error("❌ MPESA Consumer Key/Secret missing");
+
+      return res.status(500).json({
+        success: false,
+        message: "M-PESA production credentials are missing",
+      });
+    }
+
+    const auth = Buffer.from(
+      `${consumerKey}:${consumerSecret}`
+    ).toString("base64");
+
     const response = await axios.get(
       "https://api.safaricom.co.ke/oauth/v1/generate",
       {
+        params: {
+          grant_type: "client_credentials",
+        },
+
         headers: {
           Authorization: `Basic ${auth}`,
+          Accept: "application/json",
         },
+
+        timeout: 15000,
       }
     );
 
-    req.mpesaToken = response.data.access_token; // ✅ attach to req
-	  console.log(req.mpesaToken)
-    next();
+    const token = response.data?.access_token;
 
+    if (!token) {
+      console.error(
+        "❌ MPESA TOKEN NOT RETURNED:",
+        response.data
+      );
+
+      return res.status(500).json({
+        success: false,
+        message: "Safaricom did not return an access token",
+      });
+    }
+
+    req.mpesaToken = token;
+
+    console.log("✅ MPESA PRODUCTION TOKEN GENERATED");
+
+    return next();
   } catch (error) {
-    console.error(error.message);
-    res.status(500).json({
+    console.error(
+      "❌ MPESA TOKEN ERROR:",
+      error.response?.data || error.message
+    );
+
+    console.error(
+      "❌ MPESA TOKEN STATUS:",
+      error.response?.status
+    );
+
+    return res.status(500).json({
+      success: false,
       message: "Token generation failed",
-      error: error.message,
+      error:
+        error.response?.data ||
+        error.message,
     });
   }
 };
