@@ -300,61 +300,78 @@ export const useProductStore = create((set) => ({
    * ============================================================
    */
 
-  fetchProductsByCategory:
-    async (category) => {
-      try {
-        set({
-          loading: true,
-          error: null,
-        });
+	fetchProductsByCategory: async (category) => {
+	try {
+		/*
+		* Clear previous category products so we don't briefly
+		* show Shoes while Dresses are loading, for example.
+		*/
+		set({
+		loading: true,
+		error: null,
+		products: [],
+		});
 
-        const response =
-          await axios.get(
-            `/products/category/${encodeURIComponent(
-              category
-            )}`
-          );
+		const response = await axios.get(
+		`/products/category/${encodeURIComponent(
+			category
+		)}`
+		);
 
-        const products =
-          response.data?.products ||
-          response.data ||
-          [];
+		/*
+		* Supports:
+		*
+		* { products: [...] }
+		*
+		* OR
+		*
+		* [...]
+		*
+		* IMPORTANT:
+		* We keep the complete product objects so fields such as
+		* sizes, colors, stock, images, etc. reach ProductCard.
+		*/
+		const products =
+		response.data?.products ||
+		response.data ||
+		[];
 
-        set({
-          products:
-            Array.isArray(products)
-              ? products
-              : [],
-        });
+		const normalizedProducts =
+		Array.isArray(products)
+			? products
+			: [];
 
-        return products;
-      } catch (error) {
-        console.error(
-          "FETCH CATEGORY PRODUCTS ERROR:",
-          error.response?.data ||
-            error.message
-        );
+		set({
+		products: normalizedProducts,
+		});
 
-        const message =
-          error.response?.data
-            ?.message ||
-          error.response?.data
-            ?.error ||
-          "Failed to fetch products";
+		return normalizedProducts;
+	} catch (error) {
+		console.error(
+		"FETCH CATEGORY PRODUCTS ERROR:",
+		error.response?.data ||
+			error.message
+		);
 
-        set({
-          error: message,
-        });
+		const message =
+		error.response?.data?.message ||
+		error.response?.data?.error ||
+		"Failed to fetch products";
 
-        toast.error(message);
+		set({
+		products: [],
+		error: message,
+		});
 
-        throw error;
-      } finally {
-        set({
-          loading: false,
-        });
-      }
-    },
+		toast.error(message);
+
+		throw error;
+	} finally {
+		set({
+		loading: false,
+		});
+	}
+	},
 
   /*
    * ============================================================
