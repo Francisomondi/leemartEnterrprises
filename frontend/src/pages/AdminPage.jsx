@@ -4,345 +4,1278 @@ import {
   ShoppingBasket,
   Wallet,
   Package,
+  Download,
+  ReceiptText,
+  Phone,
+  User,
+  CalendarDays,
+  Hash,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+
+import {
+  useEffect,
+  useState,
+} from "react";
+
 import { motion } from "framer-motion";
 
 import AnalyticsTab from "../components/AnalyticsTab";
 import CreateProductForm from "../components/CreateProductForm";
 import ProductsList from "../components/ProductsList";
 import MpesaAnalyticsTab from "../components/MpesaAnalyticsTab";
+
 import { useProductStore } from "../stores/useProductStore";
 import axiosInstance from "../lib/axios";
 import { useUserStore } from "../stores/useUserStore";
 
+/*
+ * ============================================================
+ * ADMIN TABS
+ * ============================================================
+ */
+
 const tabs = [
-  { id: "create", label: "Create Product", icon: PlusCircle },
-  { id: "products", label: "Products", icon: ShoppingBasket },
-  { id: "analytics", label: "Analytics", icon: BarChart },
-  { id: "mpesa", label: "MPESA", icon: Wallet },
-  { id: "orders", label: "Orders", icon: Package },
-  { id: "mpesa-analytics", label: "MPESA Analytics", icon: BarChart },
+  {
+    id: "create",
+    label: "Create Product",
+    icon: PlusCircle,
+  },
+  {
+    id: "products",
+    label: "Products",
+    icon: ShoppingBasket,
+  },
+  {
+    id: "analytics",
+    label: "Analytics",
+    icon: BarChart,
+  },
+  {
+    id: "mpesa",
+    label: "MPESA",
+    icon: Wallet,
+  },
+  {
+    id: "orders",
+    label: "Orders",
+    icon: Package,
+  },
+  {
+    id: "mpesa-analytics",
+    label: "MPESA Analytics",
+    icon: BarChart,
+  },
 ];
 
+/*
+ * ============================================================
+ * HELPERS
+ * ============================================================
+ */
+
+const formatCurrency = (amount) => {
+  return new Intl.NumberFormat(
+    "en-KE",
+    {
+      style: "currency",
+      currency: "KES",
+      minimumFractionDigits: 0,
+    }
+  ).format(Number(amount || 0));
+};
+
+const formatDate = (date) => {
+  if (!date) return "—";
+
+  return new Date(date).toLocaleString(
+    "en-KE",
+    {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }
+  );
+};
+
+const StatusBadge = ({ status }) => {
+  const normalizedStatus =
+    status?.toLowerCase() || "";
+
+  const success =
+    normalizedStatus === "success" ||
+    normalizedStatus === "successful" ||
+    normalizedStatus === "completed" ||
+    normalizedStatus === "paid";
+
+  const pending =
+    normalizedStatus === "pending" ||
+    normalizedStatus === "processing";
+
+  let styles =
+    "bg-red-500/10 text-red-400 border-red-500/20";
+
+  if (success) {
+    styles =
+      "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+  }
+
+  if (pending) {
+    styles =
+      "bg-yellow-500/10 text-yellow-400 border-yellow-500/20";
+  }
+
+  return (
+    <span
+      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${styles}`}
+    >
+      {status || "Unknown"}
+    </span>
+  );
+};
+
+/*
+ * ============================================================
+ * ADMIN PAGE
+ * ============================================================
+ */
+
 const AdminPage = () => {
-  const [activeTab, setActiveTab] = useState("create");
-  const { fetchAllProducts } = useProductStore();
-  const [successfulOrders, setSuccessfulOrders] = useState([]);
-  const [ordersLoading, setOrdersLoading] = useState(true);
-  const [transactions, setTransactions] = useState([]);
-  const [loading, setLoading] = useState(true);
-   const { user} = useUserStore();
-    const [form, setForm] = useState({ name: "", phone: "" });
+  const [activeTab, setActiveTab] =
+    useState("create");
 
-  const fetchAllMpesaTransactions = async () => {
-    try {
-      const res = await axiosInstance.get("/mpesa/all", {
-        withCredentials: true,
-      });
+  const { fetchAllProducts } =
+    useProductStore();
 
-      setTransactions(
-        Array.isArray(res.data.transactions)
-          ? res.data.transactions
-          : []
-      );
-    } catch (error) {
-      console.error("Failed to fetch MPESA transactions:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { user } = useUserStore();
 
-  useEffect(() => {
-    if (user) {
-      setForm({
-        name: user.name ?? "",
-        phone: user.phone ?? "",
-      });
-    }
-    fetchAllProducts();
-    fetchAllMpesaTransactions();
-    fetchSuccessfulOrders()
-  }, [fetchAllProducts, user]);
+  const [successfulOrders, setSuccessfulOrders] =
+    useState([]);
 
-  /**
-   * ONLY SUCCESSFUL ORDERS
-   */
-  //const successfulOrders = orders;
-  /**
-   * Normalize products/items safely
+  const [ordersLoading, setOrdersLoading] =
+    useState(true);
+
+  const [transactions, setTransactions] =
+    useState([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  /*
+   * ============================================================
+   * FETCH MPESA TRANSACTIONS
+   * ============================================================
    */
 
+  const fetchAllMpesaTransactions =
+    async () => {
+      try {
+        setLoading(true);
 
-    const fetchSuccessfulOrders = async () => {
+        const res =
+          await axiosInstance.get(
+            "/mpesa/all",
+            {
+              withCredentials: true,
+            }
+          );
+
+        setTransactions(
+          Array.isArray(
+            res.data.transactions
+          )
+            ? res.data.transactions
+            : []
+        );
+      } catch (error) {
+        console.error(
+          "Failed to fetch MPESA transactions:",
+          error
+        );
+
+        setTransactions([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+  /*
+   * ============================================================
+   * FETCH SUCCESSFUL ORDERS
+   * ============================================================
+   */
+
+  const fetchSuccessfulOrders =
+    async () => {
       try {
         setOrdersLoading(true);
 
-        const res = await axiosInstance.get(
-          "/orders/success",
-          {
-            withCredentials: true,
-          }
+        const res =
+          await axiosInstance.get(
+            "/orders/success",
+            {
+              withCredentials: true,
+            }
+          );
+
+        console.log(
+          "ORDERS RESPONSE:",
+          res.data
         );
 
-        console.log("ORDERS RESPONSE:", res.data);
-
-        // SAFE ARRAY HANDLING
         if (Array.isArray(res.data)) {
-          setSuccessfulOrders(res.data);
-        } else if (Array.isArray(res.data.orders)) {
-          setSuccessfulOrders(res.data.orders);
+          setSuccessfulOrders(
+            res.data
+          );
+        } else if (
+          Array.isArray(
+            res.data.orders
+          )
+        ) {
+          setSuccessfulOrders(
+            res.data.orders
+          );
         } else {
           setSuccessfulOrders([]);
         }
-
       } catch (error) {
-        console.error("Failed to fetch orders:", error);
+        console.error(
+          "Failed to fetch orders:",
+          error
+        );
+
         setSuccessfulOrders([]);
       } finally {
         setOrdersLoading(false);
       }
     };
-  const getOrderProducts = (order) => {
-  if (!order?.items) return [];
 
-  return order.items.map((item) => ({
-    name: item.product?.name,
-    quantity: item.quantity || 1,
-    phone: order.user?.phone || "—",
-  }));
-};
+  /*
+   * ============================================================
+   * INITIAL DATA
+   * ============================================================
+   */
 
+  useEffect(() => {
+    fetchAllProducts();
+    fetchAllMpesaTransactions();
+    fetchSuccessfulOrders();
+  }, [fetchAllProducts]);
 
+  /*
+   * ============================================================
+   * NORMALIZE ORDER PRODUCTS
+   * ============================================================
+   */
 
-const exportOrdersToCSV = () => {
-  if (!successfulOrders.length) {
-    alert("No successful orders to export.");
-    return;
-  }
+  const getOrderProducts = (
+    order
+  ) => {
+    if (!order?.items) return [];
 
-  const headers = [
-    "Customer Name",
-    "Customer Email",
-    "Products",
-    "Total Amount",
-    "MPESA Receipt",
-    "Date",
-  ];
+    return order.items.map(
+      (item) => ({
+        name:
+          item.product?.name ||
+          "Unknown product",
 
-  const rows = successfulOrders.map((order) => {
-    const products = order.items
-      ?.map(
-        (item) =>
-          `${item.product?.name || "Unknown"} x ${item.quantity || 1}`
-      )
-      .join(" | ");
+        quantity:
+          item.quantity || 1,
+      })
+    );
+  };
 
-    return [
-      order.user?.name || "",
-      order.user?.email || "",
-      products || "",
-      order.totalAmount || 0,
-      order.mpesaReceiptNumber || "",
-      order.user?.phone || "",
-      order._id || "",
-      new Date(order.createdAt).toLocaleString(),
+  /*
+   * ============================================================
+   * EXPORT ORDERS
+   * ============================================================
+   */
+
+  const exportOrdersToCSV = () => {
+    if (
+      !successfulOrders.length
+    ) {
+      alert(
+        "No successful orders to export."
+      );
+
+      return;
+    }
+
+    const headers = [
+      "Customer Name",
+      "Customer Email",
+      "Products",
+      "Total Amount",
+      "MPESA Receipt",
+      "Phone",
+      "Order ID",
+      "Date",
     ];
-  });
 
-  const csvContent =
-    [headers, ...rows]
+    const rows =
+      successfulOrders.map(
+        (order) => {
+          const products =
+            order.items
+              ?.map(
+                (item) =>
+                  `${
+                    item.product
+                      ?.name ||
+                    "Unknown"
+                  } x ${
+                    item.quantity ||
+                    1
+                  }`
+              )
+              .join(" | ");
+
+          return [
+            order.user?.name ||
+              "",
+            order.user?.email ||
+              "",
+            products || "",
+            order.totalAmount ||
+              0,
+            order.mpesaReceiptNumber ||
+              "",
+            order.user?.phone ||
+              "",
+            order._id || "",
+            new Date(
+              order.createdAt
+            ).toLocaleString(),
+          ];
+        }
+      );
+
+    const csvContent = [
+      headers,
+      ...rows,
+    ]
       .map((row) =>
         row
-          .map((field) =>
-            `"${String(field).replace(/"/g, '""')}"`
+          .map(
+            (field) =>
+              `"${String(
+                field
+              ).replace(
+                /"/g,
+                '""'
+              )}"`
           )
           .join(",")
       )
       .join("\n");
 
-  const blob = new Blob([csvContent], {
-    type: "text/csv;charset=utf-8;",
-  });
+    const blob = new Blob(
+      [csvContent],
+      {
+        type: "text/csv;charset=utf-8;",
+      }
+    );
 
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.setAttribute("download", "successful-orders.csv");
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
+    const url =
+      URL.createObjectURL(blob);
+
+    const link =
+      document.createElement("a");
+
+    link.href = url;
+
+    link.setAttribute(
+      "download",
+      "successful-orders.csv"
+    );
+
+    document.body.appendChild(
+      link
+    );
+
+    link.click();
+
+    document.body.removeChild(
+      link
+    );
+
+    URL.revokeObjectURL(url);
+  };
+
+  /*
+   * ============================================================
+   * PAGE
+   * ============================================================
+   */
+
   return (
-    <div className="min-h-screen relative overflow-hidden">
-      <div className="relative z-10 container mx-auto px-4 py-16">
-        <motion.h1
-          className="text-4xl font-bold mb-8 text-emerald-400 text-center"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          Admin Dashboard
-        </motion.h1>
+    <div className="min-h-screen relative overflow-x-hidden">
 
-        {/* TABS */}
-        <div className="flex flex-wrap justify-center mb-10 gap-2">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center px-4 py-2 rounded-md transition ${
-                activeTab === tab.id
-                  ? "bg-emerald-600 text-white"
-                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-              }`}
-            >
-              <tab.icon className="mr-2 h-5 w-5" />
-              {tab.label}
-            </button>
-          ))}
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-6 sm:py-10 lg:py-16">
+
+        {/* ============================= */}
+        {/* HEADER */}
+        {/* ============================= */}
+
+        <motion.div
+          initial={{
+            opacity: 0,
+            y: -20,
+          }}
+          animate={{
+            opacity: 1,
+            y: 0,
+          }}
+          className="mb-6 sm:mb-8"
+        >
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-emerald-400 text-center">
+            Admin Dashboard
+          </h1>
+
+          <p className="text-center text-sm sm:text-base text-gray-400 mt-2">
+            Manage products,
+            payments, orders and
+            analytics
+          </p>
+        </motion.div>
+
+        {/* ============================= */}
+        {/* RESPONSIVE TABS */}
+        {/* ============================= */}
+
+        <div className="mb-6 sm:mb-10 -mx-3 sm:mx-0">
+
+          <div className="flex gap-2 overflow-x-auto px-3 sm:px-0 pb-2 scrollbar-hide sm:flex-wrap sm:justify-center">
+
+            {tabs.map((tab) => {
+              const Icon =
+                tab.icon;
+
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() =>
+                    setActiveTab(
+                      tab.id
+                    )
+                  }
+                  className={`
+                    flex
+                    flex-none
+                    items-center
+                    justify-center
+                    gap-2
+                    whitespace-nowrap
+                    rounded-lg
+                    px-3
+                    sm:px-4
+                    py-2.5
+                    text-sm
+                    font-medium
+                    transition
+                    ${
+                      activeTab ===
+                      tab.id
+                        ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/20"
+                        : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                    }
+                  `}
+                >
+                  <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+
+                  {tab.label}
+                </button>
+              );
+            })}
+
+          </div>
         </div>
 
-        {/* TAB CONTENT */}
-        {activeTab === "create" && <CreateProductForm />}
-        {activeTab === "products" && <ProductsList />}
-        {activeTab === "analytics" && <AnalyticsTab />}
-        {activeTab === "mpesa-analytics" && (
-          <MpesaAnalyticsTab transactions={transactions} />
+        {/* ============================= */}
+        {/* OTHER TABS */}
+        {/* ============================= */}
+
+        {activeTab ===
+          "create" && (
+          <CreateProductForm />
         )}
 
-        {/* MPESA TRANSACTIONS */}
-        {activeTab === "mpesa" && (
-          <div className="p-6 rounded-lg bg-gray-800 shadow">
-            <h2 className="text-2xl font-bold mb-4 text-emerald-400">
-              MPESA Transactions
-            </h2>
+        {activeTab ===
+          "products" && (
+          <ProductsList />
+        )}
+
+        {activeTab ===
+          "analytics" && (
+          <AnalyticsTab />
+        )}
+
+        {activeTab ===
+          "mpesa-analytics" && (
+          <MpesaAnalyticsTab
+            transactions={
+              transactions
+            }
+          />
+        )}
+
+        {/* ================================================== */}
+        {/* MPESA */}
+        {/* ================================================== */}
+
+        {activeTab ===
+          "mpesa" && (
+          <section className="bg-gray-800 rounded-xl sm:rounded-2xl shadow-xl overflow-hidden">
+
+            <div className="p-4 sm:p-6 border-b border-gray-700">
+
+              <div className="flex items-center gap-3">
+
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10">
+                  <Wallet className="h-5 w-5 text-emerald-400" />
+                </div>
+
+                <div>
+                  <h2 className="text-lg sm:text-2xl font-bold text-white">
+                    MPESA
+                    Transactions
+                  </h2>
+
+                  <p className="text-xs sm:text-sm text-gray-400">
+                    {
+                      transactions.length
+                    }{" "}
+                    transaction
+                    {transactions.length ===
+                    1
+                      ? ""
+                      : "s"}
+                  </p>
+                </div>
+
+              </div>
+            </div>
 
             {loading ? (
-              <p>Loading transactions...</p>
-            ) : transactions.length === 0 ? (
-              <p>No MPESA transactions found.</p>
+              <div className="p-8 text-center text-gray-400">
+                Loading
+                transactions...
+              </div>
+            ) : transactions.length ===
+              0 ? (
+              <div className="p-10 text-center">
+
+                <Wallet className="w-10 h-10 mx-auto text-gray-600 mb-3" />
+
+                <p className="font-medium text-gray-300">
+                  No MPESA
+                  transactions
+                </p>
+
+                <p className="text-sm text-gray-500 mt-1">
+                  Transactions will
+                  appear here once
+                  payments are made.
+                </p>
+
+              </div>
             ) : (
-              <table className="w-full border border-gray-700 text-sm">
-                <thead className="bg-gray-900">
-                  <tr>
-                    <th className="p-2">User</th>
-                    <th className="p-2">Phone</th>
-                    <th className="p-2">Receipt</th>
-                    <th className="p-2">Amount</th>
-                    <th className="p-2">Status</th>
-                    <th className="p-2">Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transactions.map((tx) => (
-                    <tr key={tx._id} className="border-t">
-                      <td className="p-2">
-                        {tx.user?.name || "—"}
-                        <div className="text-xs text-gray-500">
-                          {tx.user?.email}
-                        </div>
-                      </td>
-                      <td className="p-2">{tx.phoneNumber}</td>
-                      <td className="p-2">{tx.mpesaReceiptNumber || "—"}</td>
-                      <td className="p-2 font-semibold">KES {tx.amount}</td>
-                      <td className="p-2">{tx.status}</td>
-                      <td className="p-2">
-                        {new Date(tx.createdAt).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        )}
+              <>
+                {/* ============================= */}
+                {/* MOBILE TRANSACTION CARDS */}
+                {/* ============================= */}
 
-        {/* ORDERS TAB (SUCCESSFUL ONLY) */}
-        {activeTab === "orders" && (
-          <div className="p-6 rounded-lg bg-gray-800 shadow">
-            <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-emerald-400">
-              Successful Orders
-            </h2>
+                <div className="md:hidden divide-y divide-gray-700">
 
-            <button
-              onClick={exportOrdersToCSV}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-md"
-            >
-              Export CSV
-            </button>
-          </div>
+                  {transactions.map(
+                    (tx) => (
+                      <div
+                        key={
+                          tx._id
+                        }
+                        className="p-4"
+                      >
 
-            {successfulOrders.length === 0 ? (
-              <p>No successful orders yet.</p>
-            ) : (
-              <table className="w-full border border-gray-700 text-sm">
-                <thead className="bg-gray-900">
-                  <tr>
-                    <th className="p-2">Customer</th>
-                    <th className="p-2">Products</th>
-                    <th className="p-2">Amount</th>
-                    <th className="p-2">Receipt</th>
-                    <th className="p-2">Order ID</th>
-                     <th className="p-2">Phone</th>
-                    <th className="p-2">Date</th>
-                  </tr>
-                </thead>
+                        <div className="flex items-start justify-between gap-3 mb-4">
 
-                <tbody>
-                  {successfulOrders.map((order) => {
-                    const products = getOrderProducts(order);
+                          <div className="min-w-0">
 
-                    return (
-                      <tr key={order._id} className="border-t align-top">
-                        <td className="p-2">
-                          {order.user?.name || "—"}
-                          <div className="text-xs text-gray-500">
-                            {order.user?.email}
+                            <p className="font-semibold text-white truncate">
+                              {tx
+                                .user
+                                ?.name ||
+                                "Unknown customer"}
+                            </p>
+
+                            <p className="text-xs text-gray-500 truncate mt-1">
+                              {tx
+                                .user
+                                ?.email ||
+                                "No email"}
+                            </p>
+
                           </div>
-                        </td>
 
-                        <td className="p-2">
-                          {products.length > 0 ? (
-                            <ul className="space-y-1">
-                              {products.map((p, idx) => (
-                                <li key={idx}>
-                                  • {p.name}
-                                  {p.quantity && (
-                                    <span className="text-gray-400">
-                                      {" "}
-                                      × {p.quantity}
-                                    </span>
-                                  )}
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <span className="text-gray-500">
-                              No product data
-                            </span>
-                          )}
-                        </td>
+                          <StatusBadge
+                            status={
+                              tx.status
+                            }
+                          />
 
-                        <td className="p-2 font-semibold">
-                          KES {order.totalAmount}
-                        </td>
-                        <td className="p-2 font-mono">
-                          {order.mpesaReceiptNumber}
-                        </td>
-                        <td className="p-2">{order._id|| "—"}</td>
-                        <td className="p-2">{order.user?.phone || "—"}</td>
-                        <td className="p-2">
-                          {new Date(order.createdAt).toLocaleString()}
-                        </td>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+
+                          <div className="bg-gray-900/60 rounded-lg p-3">
+
+                            <p className="text-xs text-gray-500 mb-1">
+                              Amount
+                            </p>
+
+                            <p className="font-bold text-emerald-400">
+                              {formatCurrency(
+                                tx.amount
+                              )}
+                            </p>
+
+                          </div>
+
+                          <div className="bg-gray-900/60 rounded-lg p-3 min-w-0">
+
+                            <p className="text-xs text-gray-500 mb-1">
+                              Phone
+                            </p>
+
+                            <p className="text-sm text-gray-200 truncate">
+                              {tx.phoneNumber ||
+                                "—"}
+                            </p>
+
+                          </div>
+
+                        </div>
+
+                        <div className="mt-4 space-y-3 text-sm">
+
+                          <div className="flex items-start gap-2">
+
+                            <ReceiptText className="h-4 w-4 text-gray-500 mt-0.5 shrink-0" />
+
+                            <div className="min-w-0">
+                              <p className="text-xs text-gray-500">
+                                Receipt
+                              </p>
+
+                              <p className="font-mono text-gray-300 break-all">
+                                {tx.mpesaReceiptNumber ||
+                                  "—"}
+                              </p>
+                            </div>
+
+                          </div>
+
+                          <div className="flex items-start gap-2">
+
+                            <CalendarDays className="h-4 w-4 text-gray-500 mt-0.5 shrink-0" />
+
+                            <div>
+                              <p className="text-xs text-gray-500">
+                                Date
+                              </p>
+
+                              <p className="text-gray-300">
+                                {formatDate(
+                                  tx.createdAt
+                                )}
+                              </p>
+                            </div>
+
+                          </div>
+
+                        </div>
+
+                      </div>
+                    )
+                  )}
+
+                </div>
+
+                {/* ============================= */}
+                {/* DESKTOP MPESA TABLE */}
+                {/* ============================= */}
+
+                <div className="hidden md:block overflow-x-auto">
+
+                  <table className="w-full text-sm">
+
+                    <thead className="bg-gray-900/80 text-gray-400">
+
+                      <tr>
+                        <th className="px-4 py-3 text-left font-medium">
+                          Customer
+                        </th>
+
+                        <th className="px-4 py-3 text-left font-medium">
+                          Phone
+                        </th>
+
+                        <th className="px-4 py-3 text-left font-medium">
+                          Receipt
+                        </th>
+
+                        <th className="px-4 py-3 text-left font-medium">
+                          Amount
+                        </th>
+
+                        <th className="px-4 py-3 text-left font-medium">
+                          Status
+                        </th>
+
+                        <th className="px-4 py-3 text-left font-medium">
+                          Date
+                        </th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+
+                    </thead>
+
+                    <tbody className="divide-y divide-gray-700">
+
+                      {transactions.map(
+                        (tx) => (
+                          <tr
+                            key={
+                              tx._id
+                            }
+                            className="hover:bg-gray-700/30 transition"
+                          >
+
+                            <td className="px-4 py-4">
+
+                              <p className="font-medium text-white">
+                                {tx
+                                  .user
+                                  ?.name ||
+                                  "—"}
+                              </p>
+
+                              <p className="text-xs text-gray-500 mt-1">
+                                {tx
+                                  .user
+                                  ?.email ||
+                                  ""}
+                              </p>
+
+                            </td>
+
+                            <td className="px-4 py-4 whitespace-nowrap text-gray-300">
+                              {tx.phoneNumber ||
+                                "—"}
+                            </td>
+
+                            <td className="px-4 py-4 font-mono text-gray-300 whitespace-nowrap">
+                              {tx.mpesaReceiptNumber ||
+                                "—"}
+                            </td>
+
+                            <td className="px-4 py-4 font-semibold text-emerald-400 whitespace-nowrap">
+                              {formatCurrency(
+                                tx.amount
+                              )}
+                            </td>
+
+                            <td className="px-4 py-4">
+                              <StatusBadge
+                                status={
+                                  tx.status
+                                }
+                              />
+                            </td>
+
+                            <td className="px-4 py-4 whitespace-nowrap text-gray-400">
+                              {formatDate(
+                                tx.createdAt
+                              )}
+                            </td>
+
+                          </tr>
+                        )
+                      )}
+
+                    </tbody>
+                  </table>
+
+                </div>
+              </>
             )}
-          </div>
+
+          </section>
         )}
+
+        {/* ================================================== */}
+        {/* ORDERS */}
+        {/* ================================================== */}
+
+        {activeTab ===
+          "orders" && (
+          <section className="bg-gray-800 rounded-xl sm:rounded-2xl shadow-xl overflow-hidden">
+
+            {/* HEADER */}
+
+            <div className="p-4 sm:p-6 border-b border-gray-700">
+
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+
+                <div className="flex items-center gap-3">
+
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10 shrink-0">
+                    <Package className="h-5 w-5 text-emerald-400" />
+                  </div>
+
+                  <div>
+                    <h2 className="text-lg sm:text-2xl font-bold text-white">
+                      Successful
+                      Orders
+                    </h2>
+
+                    <p className="text-xs sm:text-sm text-gray-400 mt-1">
+                      {
+                        successfulOrders.length
+                      }{" "}
+                      successful order
+                      {successfulOrders.length ===
+                      1
+                        ? ""
+                        : "s"}
+                    </p>
+                  </div>
+
+                </div>
+
+                <button
+                  type="button"
+                  onClick={
+                    exportOrdersToCSV
+                  }
+                  disabled={
+                    !successfulOrders.length
+                  }
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg font-medium transition"
+                >
+                  <Download className="h-4 w-4" />
+
+                  Export CSV
+                </button>
+
+              </div>
+            </div>
+
+            {ordersLoading ? (
+              <div className="p-8 text-center text-gray-400">
+                Loading orders...
+              </div>
+            ) : successfulOrders.length ===
+              0 ? (
+              <div className="p-10 text-center">
+
+                <Package className="w-10 h-10 mx-auto text-gray-600 mb-3" />
+
+                <p className="font-medium text-gray-300">
+                  No successful
+                  orders yet
+                </p>
+
+                <p className="text-sm text-gray-500 mt-1">
+                  Completed customer
+                  orders will appear
+                  here.
+                </p>
+
+              </div>
+            ) : (
+              <>
+                {/* ============================= */}
+                {/* MOBILE ORDER CARDS */}
+                {/* ============================= */}
+
+                <div className="md:hidden divide-y divide-gray-700">
+
+                  {successfulOrders.map(
+                    (order) => {
+                      const products =
+                        getOrderProducts(
+                          order
+                        );
+
+                      return (
+                        <article
+                          key={
+                            order._id
+                          }
+                          className="p-4"
+                        >
+
+                          {/* CUSTOMER */}
+
+                          <div className="flex items-start justify-between gap-3 mb-4">
+
+                            <div className="flex items-start gap-3 min-w-0">
+
+                              <div className="h-10 w-10 rounded-full bg-gray-700 flex items-center justify-center shrink-0">
+                                <User className="h-5 w-5 text-gray-400" />
+                              </div>
+
+                              <div className="min-w-0">
+
+                                <p className="font-semibold text-white truncate">
+                                  {order
+                                    .user
+                                    ?.name ||
+                                    "Unknown customer"}
+                                </p>
+
+                                <p className="text-xs text-gray-500 truncate mt-1">
+                                  {order
+                                    .user
+                                    ?.email ||
+                                    "No email"}
+                                </p>
+
+                              </div>
+
+                            </div>
+
+                            <span className="inline-flex shrink-0 items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              Paid
+                            </span>
+
+                          </div>
+
+                          {/* AMOUNT / PHONE */}
+
+                          <div className="grid grid-cols-2 gap-3 mb-4">
+
+                            <div className="bg-gray-900/60 rounded-lg p-3">
+
+                              <p className="text-xs text-gray-500 mb-1">
+                                Total
+                              </p>
+
+                              <p className="font-bold text-emerald-400">
+                                {formatCurrency(
+                                  order.totalAmount
+                                )}
+                              </p>
+
+                            </div>
+
+                            <div className="bg-gray-900/60 rounded-lg p-3 min-w-0">
+
+                              <div className="flex items-center gap-1 mb-1 text-gray-500">
+                                <Phone className="h-3 w-3" />
+
+                                <p className="text-xs">
+                                  Phone
+                                </p>
+                              </div>
+
+                              <p className="text-sm text-gray-200 truncate">
+                                {order
+                                  .user
+                                  ?.phone ||
+                                  "—"}
+                              </p>
+
+                            </div>
+
+                          </div>
+
+                          {/* PRODUCTS */}
+
+                          <div className="mb-4">
+
+                            <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">
+                              Products
+                            </p>
+
+                            {products.length >
+                            0 ? (
+                              <div className="space-y-2">
+
+                                {products.map(
+                                  (
+                                    product,
+                                    index
+                                  ) => (
+                                    <div
+                                      key={
+                                        index
+                                      }
+                                      className="flex justify-between gap-3 bg-gray-900/40 rounded-lg px-3 py-2"
+                                    >
+                                      <span className="text-sm text-gray-300">
+                                        {
+                                          product.name
+                                        }
+                                      </span>
+
+                                      <span className="text-sm font-medium text-gray-400 whitespace-nowrap">
+                                        ×{" "}
+                                        {
+                                          product.quantity
+                                        }
+                                      </span>
+                                    </div>
+                                  )
+                                )}
+
+                              </div>
+                            ) : (
+                              <p className="text-sm text-gray-500">
+                                No product
+                                data
+                              </p>
+                            )}
+
+                          </div>
+
+                          {/* ORDER DETAILS */}
+
+                          <div className="space-y-3 pt-4 border-t border-gray-700">
+
+                            <div className="flex items-start gap-2">
+
+                              <ReceiptText className="h-4 w-4 text-gray-500 mt-0.5 shrink-0" />
+
+                              <div className="min-w-0">
+
+                                <p className="text-xs text-gray-500">
+                                  MPESA Receipt
+                                </p>
+
+                                <p className="font-mono text-sm text-gray-300 break-all">
+                                  {order.mpesaReceiptNumber ||
+                                    "—"}
+                                </p>
+
+                              </div>
+
+                            </div>
+
+                            <div className="flex items-start gap-2">
+
+                              <Hash className="h-4 w-4 text-gray-500 mt-0.5 shrink-0" />
+
+                              <div className="min-w-0">
+
+                                <p className="text-xs text-gray-500">
+                                  Order ID
+                                </p>
+
+                                <p className="font-mono text-xs text-gray-400 break-all">
+                                  {order._id ||
+                                    "—"}
+                                </p>
+
+                              </div>
+
+                            </div>
+
+                            <div className="flex items-start gap-2">
+
+                              <CalendarDays className="h-4 w-4 text-gray-500 mt-0.5 shrink-0" />
+
+                              <div>
+
+                                <p className="text-xs text-gray-500">
+                                  Date
+                                </p>
+
+                                <p className="text-sm text-gray-300">
+                                  {formatDate(
+                                    order.createdAt
+                                  )}
+                                </p>
+
+                              </div>
+
+                            </div>
+
+                          </div>
+
+                        </article>
+                      );
+                    }
+                  )}
+
+                </div>
+
+                {/* ============================= */}
+                {/* DESKTOP ORDERS TABLE */}
+                {/* ============================= */}
+
+                <div className="hidden md:block overflow-x-auto">
+
+                  <table className="w-full text-sm">
+
+                    <thead className="bg-gray-900/80 text-gray-400">
+
+                      <tr>
+                        <th className="px-4 py-3 text-left font-medium">
+                          Customer
+                        </th>
+
+                        <th className="px-4 py-3 text-left font-medium">
+                          Products
+                        </th>
+
+                        <th className="px-4 py-3 text-left font-medium">
+                          Amount
+                        </th>
+
+                        <th className="px-4 py-3 text-left font-medium">
+                          Receipt
+                        </th>
+
+                        <th className="px-4 py-3 text-left font-medium">
+                          Order ID
+                        </th>
+
+                        <th className="px-4 py-3 text-left font-medium">
+                          Phone
+                        </th>
+
+                        <th className="px-4 py-3 text-left font-medium">
+                          Date
+                        </th>
+                      </tr>
+
+                    </thead>
+
+                    <tbody className="divide-y divide-gray-700">
+
+                      {successfulOrders.map(
+                        (order) => {
+                          const products =
+                            getOrderProducts(
+                              order
+                            );
+
+                          return (
+                            <tr
+                              key={
+                                order._id
+                              }
+                              className="align-top hover:bg-gray-700/30 transition"
+                            >
+
+                              <td className="px-4 py-4 min-w-[180px]">
+
+                                <p className="font-medium text-white">
+                                  {order
+                                    .user
+                                    ?.name ||
+                                    "—"}
+                                </p>
+
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {order
+                                    .user
+                                    ?.email ||
+                                    ""}
+                                </p>
+
+                              </td>
+
+                              <td className="px-4 py-4 min-w-[200px]">
+
+                                {products.length >
+                                0 ? (
+                                  <ul className="space-y-1">
+
+                                    {products.map(
+                                      (
+                                        product,
+                                        index
+                                      ) => (
+                                        <li
+                                          key={
+                                            index
+                                          }
+                                          className="text-gray-300"
+                                        >
+                                          {
+                                            product.name
+                                          }
+
+                                          <span className="text-gray-500 ml-1">
+                                            ×{" "}
+                                            {
+                                              product.quantity
+                                            }
+                                          </span>
+                                        </li>
+                                      )
+                                    )}
+
+                                  </ul>
+                                ) : (
+                                  <span className="text-gray-500">
+                                    No product
+                                    data
+                                  </span>
+                                )}
+
+                              </td>
+
+                              <td className="px-4 py-4 font-semibold text-emerald-400 whitespace-nowrap">
+                                {formatCurrency(
+                                  order.totalAmount
+                                )}
+                              </td>
+
+                              <td className="px-4 py-4 font-mono whitespace-nowrap text-gray-300">
+                                {order.mpesaReceiptNumber ||
+                                  "—"}
+                              </td>
+
+                              <td
+                                className="px-4 py-4 font-mono text-xs text-gray-400 max-w-[160px] truncate"
+                                title={
+                                  order._id
+                                }
+                              >
+                                {order._id ||
+                                  "—"}
+                              </td>
+
+                              <td className="px-4 py-4 whitespace-nowrap text-gray-300">
+                                {order
+                                  .user
+                                  ?.phone ||
+                                  "—"}
+                              </td>
+
+                              <td className="px-4 py-4 whitespace-nowrap text-gray-400">
+                                {formatDate(
+                                  order.createdAt
+                                )}
+                              </td>
+
+                            </tr>
+                          );
+                        }
+                      )}
+
+                    </tbody>
+                  </table>
+
+                </div>
+              </>
+            )}
+
+          </section>
+        )}
+
       </div>
     </div>
   );
