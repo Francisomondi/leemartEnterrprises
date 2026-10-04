@@ -44,19 +44,39 @@ const userSchema = new mongoose.Schema(
       default: "",
     },
 
-    cartItems: [
-      {
-        quantity: {
-          type: Number,
-          default: 1,
-        },
-
-        product: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Product",
-        },
+  cartItems: [
+    {
+      quantity: {
+        type: Number,
+        default: 1,
+        min: 1,
       },
-    ],
+
+      product: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Product",
+        required: true,
+      },
+
+      /*
+      * Customer-selected product variant.
+      *
+      * Empty string means the product does not
+      * require that option.
+      */
+      size: {
+        type: String,
+        default: "",
+        trim: true,
+      },
+
+      color: {
+        type: String,
+        default: "",
+        trim: true,
+      },
+    },
+  ],
 
     role: {
       type: String,

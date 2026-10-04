@@ -2,103 +2,535 @@ import { create } from "zustand";
 import axios from "../lib/axios";
 import { toast } from "react-hot-toast";
 
-export const useCartStore = create((set, get) => ({
-	cart: [],
-	coupon: null,
-	total: 0,
-	subtotal: 0,
-	isCouponApplied: false,
+/*
+ * ============================================================
+ * NORMALIZE VARIANT VALUES
+ * ============================================================
+ */
 
-	getMyCoupon: async () => {
-		try {
-			const response = await axios.get("/coupons");
-			set({ coupon: response.data });
-		} catch (error) {
-			console.error("Error fetching coupon:", error);
-		}
-	},
-	applyCoupon: async (code) => {
-		try {
-			const response = await axios.post("/coupons/validate", { code });
-			set({ coupon: response.data, isCouponApplied: true });
-			get().calculateTotals();
-			toast.success("Coupon applied successfully");
-		} catch (error) {
-			toast.error(error.response?.data?.message || "Failed to apply coupon");
-		}
-	},
-	removeCoupon: () => {
-		set({ coupon: null, isCouponApplied: false });
-		get().calculateTotals();
-		toast.success("Coupon removed");
-	},
+const normalizeSize = (size) =>
+  String(size || "").trim();
 
-	getCartItems: async () => {
-		try {
-			const res = await axios.get("/cart");
-			set({ cart: res.data });
-			get().calculateTotals();
-		} catch (error) {
-			set({ cart: [] });
-			toast.error(error.response.data.message || "An error occurred");
-		}
-	},
+const normalizeColor = (color) =>
+  String(color || "")
+    .trim()
+    .toLowerCase();
+
+/*
+ * ============================================================
+ * SAME CART VARIANT
+ * ============================================================
+ *
+ * A cart line is identified by:
+ *
+ * product ID
+ * +
+ * selected size
+ * +
+ * selected color
+ */
+
+const isSameVariant = (
+  item,
+  productId,
+  size,
+  color
+) => {
+  return (
+    String(item._id) ===
+      String(productId) &&
+    normalizeSize(item.size) ===
+      normalizeSize(size) &&
+    normalizeColor(item.color) ===
+      normalizeColor(color)
+  );
+};
+
+/*
+ * ============================================================
+ * CART STORE
+ * ============================================================
+ */
+
+export const useCartStore = create(
+  (set, get) => ({
+    cart: [],
+
+    coupon: null,
+
+    total: 0,
+
+    subtotal: 0,
+
+    isCouponApplied: false,
+
+    /*
+     * ========================================================
+     * GET COUPON
+     * ========================================================
+     */
+
+    getMyCoupon: async () => {
+      try {
+        const response =
+          await axios.get(
+            "/coupons"
+          );
+
+        set({
+          coupon:
+            response.data,
+        });
+      } catch (error) {
+        console.error(
+          "Error fetching coupon:",
+          error
+        );
+      }
+    },
+
+    /*
+     * ========================================================
+     * APPLY COUPON
+     * ========================================================
+     */
+
+    applyCoupon: async (
+      code
+    ) => {
+      try {
+        const response =
+          await axios.post(
+            "/coupons/validate",
+            { code }
+          );
+
+        set({
+          coupon:
+            response.data,
+
+          isCouponApplied:
+            true,
+        });
+
+        get().calculateTotals();
+
+        toast.success(
+          "Coupon applied successfully"
+        );
+      } catch (error) {
+        toast.error(
+          error.response?.data
+            ?.message ||
+            "Failed to apply coupon"
+        );
+      }
+    },
+
+    /*
+     * ========================================================
+     * REMOVE COUPON
+     * ========================================================
+     */
+
+    removeCoupon: () => {
+      set({
+        coupon: null,
+
+        isCouponApplied:
+          false,
+      });
+
+      get().calculateTotals();
+
+      toast.success(
+        "Coupon removed"
+      );
+    },
+
+    /*
+     * ========================================================
+     * GET CART
+     * ========================================================
+     */
+
+    getCartItems: async () => {
+      try {
+        const response =
+          await axios.get(
+            "/cart"
+          );
+
+        const cart =
+          Array.isArray(
+            response.data
+          )
+            ? response.data
+            : response.data
+                ?.cart || [];
+
+        set({
+          cart,
+        });
+
+        get().calculateTotals();
+      } catch (error) {
+        console.error(
+          "GET CART ERROR:",
+          error.response?.data ||
+            error.message
+        );
+
+        set({
+          cart: [],
+        });
+
+        toast.error(
+          error.response?.data
+            ?.message ||
+            "Failed to load cart"
+        );
+      }
+    },
+
+    /*
+     * ========================================================
+     * ADD TO CART
+     * ========================================================
+     */
+
+    addToCart: async (
+      product
+    ) => {
+      try {
+        const size =
+          product.size || null;
+
+        const color =
+          product.color || null;
+
+        /*
+         * Send the customer's selected
+         * variant to the backend.
+         */
+
+        const response =
+          await axios.post(
+            "/cart",
+            {
+              productId:
+                product._id,
+
+              size,
+
+              color,
+            }
+          );
+
+        /*
+         * Update UI immediately.
+         */
+
+        set((state) => {
+          const existingItem =
+            state.cart.find(
+              (item) =>
+                isSameVariant(
+                  item,
+                  product._id,
+                  size,
+                  color
+                )
+            );
+
+          let newCart;
+
+          if (existingItem) {
+            newCart =
+              state.cart.map(
+                (item) =>
+                  isSameVariant(
+                    item,
+                    product._id,
+                    size,
+                    color
+                  )
+                    ? {
+                        ...item,
+
+                        quantity:
+                          Number(
+                            item.quantity ||
+                              1
+                          ) + 1,
+                      }
+                    : item
+              );
+          } else {
+            newCart = [
+              ...state.cart,
+
+              {
+                ...product,
+
+                size,
+
+                color,
+
+                quantity: 1,
+              },
+            ];
+          }
+
+          return {
+            cart: newCart,
+          };
+        });
+
+        get().calculateTotals();
+
+        toast.success(
+          "Product added to cart"
+        );
+
+        return response.data;
+      } catch (error) {
+        console.error(
+          "ADD TO CART ERROR:",
+          error.response?.data ||
+            error.message
+        );
+
+        toast.error(
+          error.response?.data
+            ?.message ||
+            "Failed to add product to cart"
+        );
+
+        throw error;
+      }
+    },
+
+    /*
+     * ========================================================
+     * REMOVE FROM CART
+     * ========================================================
+     */
+
+    removeFromCart: async (
+      productId,
+      size = null,
+      color = null
+    ) => {
+      try {
+        /*
+         * DELETE can send a body through
+         * Axios using `data`.
+         */
+
+        await axios.delete(
+          "/cart",
+          {
+            data: {
+              productId,
+              size,
+              color,
+            },
+          }
+        );
+
+        set((state) => ({
+          cart:
+            state.cart.filter(
+              (item) =>
+                !isSameVariant(
+                  item,
+                  productId,
+                  size,
+                  color
+                )
+            ),
+        }));
+
+        get().calculateTotals();
+
+        toast.success(
+          "Product removed from cart"
+        );
+      } catch (error) {
+        console.error(
+          "REMOVE CART ITEM ERROR:",
+          error.response?.data ||
+            error.message
+        );
+
+        toast.error(
+          error.response?.data
+            ?.message ||
+            "Failed to remove product"
+        );
+
+        throw error;
+      }
+    },
+
+    /*
+     * ========================================================
+     * UPDATE QUANTITY
+     * ========================================================
+     */
+
+    updateQuantity: async (
+      productId,
+      quantity,
+      size = null,
+      color = null
+    ) => {
+      try {
+        if (quantity <= 0) {
+          await get().removeFromCart(
+            productId,
+            size,
+            color
+          );
+
+          return;
+        }
+
+        await axios.put(
+          `/cart/${productId}`,
+          {
+            quantity,
+            size,
+            color,
+          }
+        );
+
+        set((state) => ({
+          cart:
+            state.cart.map(
+              (item) =>
+                isSameVariant(
+                  item,
+                  productId,
+                  size,
+                  color
+                )
+                  ? {
+                      ...item,
+                      quantity,
+                    }
+                  : item
+            ),
+        }));
+
+        get().calculateTotals();
+      } catch (error) {
+        console.error(
+          "UPDATE CART QUANTITY ERROR:",
+          error.response?.data ||
+            error.message
+        );
+
+        toast.error(
+          error.response?.data
+            ?.message ||
+            "Failed to update quantity"
+        );
+
+        throw error;
+      }
+    },
+
+    /*
+     * ========================================================
+     * CLEAR CART
+     * ========================================================
+     */
 
 	clearCart: async () => {
-		try {
-		set({ cart: [ ] }); // optimistic UI update
-		await get().getCartItems();       // sync with backend
-		} catch (err) {
-		console.error("Failed to clear cart:", err);
-		}
-	},
+	try {
+		await axios.delete("/cart");
 
-	addToCart: async (product) => {
-		try {
-			await axios.post("/cart", { productId: product._id });
-			toast.success("Product added to cart");
+		set({
+		cart: [],
+		subtotal: 0,
+		total: 0,
+		});
 
-			set((prevState) => {
-				const existingItem = prevState.cart.find((item) => item._id === product._id);
-				const newCart = existingItem
-					? prevState.cart.map((item) =>
-							item._id === product._id ? { ...item, quantity: item.quantity + 1 } : item
-					  )
-					: [...prevState.cart, { ...product, quantity: 1 }];
-				return { cart: newCart };
-			});
-			get().calculateTotals();
-		} catch (error) {
-			toast.error(error.response.data.message || "An error occurred");
-		}
-	},
-	removeFromCart: async (productId) => {
-		await axios.delete(`/cart`, { data: { productId } });
-		set((prevState) => ({ cart: prevState.cart.filter((item) => item._id !== productId) }));
 		get().calculateTotals();
-	},
-	updateQuantity: async (productId, quantity) => {
-		if (quantity === 0) {
-			get().removeFromCart(productId);
-			return;
-		}
+	} catch (error) {
+		console.error(
+		"CLEAR CART ERROR:",
+		error.response?.data ||
+			error.message
+		);
 
-		await axios.put(`/cart/${productId}`, { quantity });
-		set((prevState) => ({
-			cart: prevState.cart.map((item) => (item._id === productId ? { ...item, quantity } : item)),
-		}));
-		get().calculateTotals();
-	},
-	calculateTotals: () => {
-		const { cart, coupon } = get();
-		const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-		let total = subtotal;
+		toast.error(
+		error.response?.data?.message ||
+			"Failed to clear cart"
+		);
 
-		if (coupon) {
-			const discount = subtotal * (coupon.discountPercentage / 100);
-			total = subtotal - discount;
-		}
-
-		set({ subtotal, total });
+		throw error;
+	}
 	},
-}));
+
+    /*
+     * ========================================================
+     * CALCULATE TOTALS
+     * ========================================================
+     */
+
+    calculateTotals: () => {
+      const {
+        cart,
+        coupon,
+      } = get();
+
+      const subtotal =
+        cart.reduce(
+          (sum, item) => {
+            const price =
+              Number(
+                item.price || 0
+              );
+
+            const quantity =
+              Number(
+                item.quantity || 0
+              );
+
+            return (
+              sum +
+              price * quantity
+            );
+          },
+          0
+        );
+
+      let total =
+        subtotal;
+
+      if (coupon) {
+        const percentage =
+          Number(
+            coupon.discountPercentage ||
+              0
+          );
+
+        const discount =
+          subtotal *
+          (percentage / 100);
+
+        total =
+          subtotal -
+          discount;
+      }
+
+      set({
+        subtotal,
+        total,
+      });
+    },
+  })
+);
