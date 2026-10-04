@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link,  useNavigate} from "react-router-dom";
 import { UserPlus, Mail, Lock, User, ArrowRight, Loader } from "lucide-react";
 import { motion } from "framer-motion";
 import { useUserStore } from "../stores/useUserStore";
@@ -7,6 +7,7 @@ import { GoogleLogin } from "@react-oauth/google";
 import toast from "react-hot-toast";
 
 const SignUpPage = () => {
+	const navigate = useNavigate();
 	const [formData, setFormData] = useState({
 		name: "",
 		email: "",
@@ -21,16 +22,35 @@ const SignUpPage = () => {
 	credentialResponse
 	) => {
 	try {
-		if (!credentialResponse.credential) {
+		const credential =
+		credentialResponse?.credential;
+
+		if (!credential) {
 		toast.error(
 			"Google did not return a credential"
 		);
 		return;
 		}
 
-		await googleLogin(
-		credentialResponse.credential
+		const user = await googleLogin(
+		credential
 		);
+
+		if (
+		user.requiresProfileCompletion ||
+		!user.phone
+		) {
+		navigate(
+			"/complete-profile",
+			{ replace: true }
+		);
+
+		return;
+		}
+
+		navigate("/", {
+		replace: true,
+		});
 	} catch (error) {
 		console.error(
 		"Google signup failed:",

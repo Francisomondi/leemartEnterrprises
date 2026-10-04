@@ -1,38 +1,58 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, } from "react-router-dom";
 import { LogIn, Mail, Lock, ArrowRight, Loader } from "lucide-react";
 import { useUserStore } from "../stores/useUserStore";
 import { GoogleLogin } from "@react-oauth/google";
 import toast from "react-hot-toast";
 
 const LoginPage = () => {
+	const navigate = useNavigate();
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 
 	const { login, googleLogin, loading } = useUserStore();
 
 	const handleGoogleSuccess = async (
-		credentialResponse
-		) => {
-		try {
-			if (!credentialResponse.credential) {
-			toast.error(
-				"Google did not return a credential"
-			);
-			return;
-			}
+	credentialResponse
+	) => {
+	try {
+		const credential =
+		credentialResponse?.credential;
 
-			await googleLogin(
-			credentialResponse.credential
-			);
-		} catch (error) {
-			console.error(
-			"Google authentication failed:",
-			error
-			);
+		if (!credential) {
+		toast.error(
+			"Google did not return a credential"
+		);
+		return;
 		}
-		};
+
+		const user = await googleLogin(
+		credential
+		);
+
+		if (
+		user.requiresProfileCompletion ||
+		!user.phone
+		) {
+		navigate(
+			"/complete-profile",
+			{ replace: true }
+		);
+
+		return;
+		}
+
+		navigate("/", {
+		replace: true,
+		});
+	} catch (error) {
+		console.error(
+		"Google login failed:",
+		error
+		);
+	}
+	};
 
 	const handleSubmit = (e) => {
 		e.preventDefault();

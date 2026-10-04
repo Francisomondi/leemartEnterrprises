@@ -23,6 +23,7 @@ export const useUserStore = create((set, get) => ({
 			toast.error(error.response.data.message || "An error occurred");
 		}
 	},
+
 	login: async (email, password) => {
 		set({ loading: true });
 
@@ -37,44 +38,42 @@ export const useUserStore = create((set, get) => ({
 	},
 
 	googleLogin: async (credential) => {
-  try {
-    set({ loading: true });
+	try {
+		set({ loading: true });
 
-    const res = await axios.post(
-      "/auth/google",
-      {
-        credential,
-      }
-    );
+		const res = await axios.post("/auth/google", {
+		credential,
+		});
 
-    set({
-      user: res.data,
-      loading: false,
-    });
+		set({
+		user: res.data,
+		loading: false,
+		});
 
-    toast.success(
-      `Welcome ${res.data.name}`
-    );
+		toast.success(`Welcome ${res.data.name}`);
 
-    return res.data;
-  } catch (error) {
-    console.error(
-      "Google login error:",
-      error.response?.data || error.message
-    );
+		// IMPORTANT:
+		// LoginPage / SignUpPage uses this response
+		// to determine where to navigate.
+		return res.data;
+	} catch (error) {
+		console.error(
+		"Google authentication error:",
+		error.response?.data || error.message
+		);
 
-    set({
-      loading: false,
-    });
+		set({
+		loading: false,
+		});
 
-    toast.error(
-      error.response?.data?.message ||
-        "Google authentication failed"
-    );
+		toast.error(
+		error.response?.data?.message ||
+			"Google authentication failed"
+		);
 
-    throw error;
-  }
-},
+		throw error;
+	}
+	},
 
 	logout: async () => {
 		try {
@@ -118,38 +117,61 @@ export const useUserStore = create((set, get) => ({
       set({ user: null });
     }
   },
-  updateProfile: async (data) => {
-    try {
-      set({ loading: true });
-      const res = await axios.put("/auth/profile", data);
-      set({ user: res.data });
-      toast.success("Profile updated");
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Update failed");
-    } finally {
-      set({ loading: false });
-    }
-  },
-  updateAvatar: async (file) => {
+	updateProfile: async (data) => {
 	try {
-	  set({ loading: true });
-	  const formData = new FormData();
-	  formData.append("avatar", file);	
+		set({ loading: true });
 
-	  const res = await axios.put("/auth/avatar", formData, {
-		headers: {
-		  "Content-Type": "multipart/form-data",
-		},
-	  });
-	  set({ user: res.data });
-	  toast.success("Avatar updated successfully!");
+		const res = await axios.put(
+		"/auth/profile",
+		data
+		);
+
+		set({
+		user: res.data,
+		});
+
+		toast.success("Profile updated successfully");
+
+		return res.data;
 	} catch (error) {
-	  console.error(error);
-	  toast.error("Failed to upload avatar.");
+		console.error(
+		"Profile update error:",
+		error.response?.data || error.message
+		);
+
+		toast.error(
+		error.response?.data?.message ||
+			"Failed to update profile"
+		);
+
+		throw error;
 	} finally {
-	  set({ loading: false });
+		set({
+		loading: false,
+		});
 	}
-  }
+	},
+
+	updateAvatar: async (file) => {
+		try {
+		set({ loading: true });
+		const formData = new FormData();
+		formData.append("avatar", file);	
+
+		const res = await axios.put("/auth/avatar", formData, {
+			headers: {
+			"Content-Type": "multipart/form-data",
+			},
+		});
+		set({ user: res.data });
+		toast.success("Avatar updated successfully!");
+		} catch (error) {
+		console.error(error);
+		toast.error("Failed to upload avatar.");
+		} finally {
+		set({ loading: false });
+		}
+	}
 
 }));
 

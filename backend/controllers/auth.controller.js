@@ -125,15 +125,19 @@ export const googleAuth = async (req, res) => {
        RESPONSE
     ========================================== */
 
-    return res.status(200).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      avatar: user.avatar,
-      role: user.role,
-      authProvider: user.authProvider,
-    });
+	return res.status(200).json({
+	_id: user._id,
+	name: user.name,
+	email: user.email,
+	phone: user.phone || "",
+	avatar: user.avatar,
+	role: user.role,
+	authProvider: user.authProvider,
+
+	// Google does not provide the customer's
+	// Safaricom number.
+	requiresProfileCompletion: !user.phone,
+	});
   } catch (error) {
     console.error(
       "Google authentication error:",
@@ -217,13 +221,15 @@ export const login = async (req, res) => {
 			await storeRefreshToken(user._id, refreshToken);
 			setCookies(res, accessToken, refreshToken);
 
-			res.json({
-				_id: user._id,
-				name: user.name,
-				email: user.email,
-				avatar: user.avatar,
-				role: user.role,
-			});
+      res.json({
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone || "",
+        avatar: user.avatar,
+        role: user.role,
+        authProvider: user.authProvider,
+      });
 		} else {
 			res.status(400).json({ message: "Invalid email or password" });
 		}
@@ -291,32 +297,81 @@ export const getProfile = async (req, res) => {
 };
 
 export const updateProfile = async (req, res) => {
-  const { name, phone } = req.body;
+  try {
+    const { name, phone } = req.body;
 
-  let formattedPhone = phone.trim();
+    const updates = {};
 
-// Accept 07XXXXXXXX or 01XXXXXXXX
-if (/^0(7|1)\d{8}$/.test(formattedPhone)) {
-  formattedPhone = "254" + formattedPhone.slice(1);
-}
+    // =========================
+    // NAME
+    // =========================
+    if (typeof name === "string" && name.trim()) {
+      updates.name = name.trim();
+    }
 
-// Accept 2547XXXXXXXX or 2541XXXXXXXX
-else if (!/^254(7|1)\d{8}$/.test(formattedPhone)) {
-  return res.status(400).json({
-    message: "Invalid Safaricom phone number",
-  });
-}
+    // =========================
+    // PHONE
+    // =========================
+    if (phone !== undefined) {
+      let formattedPhone = String(phone).trim();
 
-// ✅ formattedPhone is now ALWAYS 254XXXXXXXXX
+      // 07XXXXXXXX / 01XXXXXXXX
+      if (/^0(7|1)\d{8}$/.test(formattedPhone)) {
+        formattedPhone =
+          "254" + formattedPhone.slice(1);
+      }
 
+      // 7XXXXXXXX / 1XXXXXXXX
+      else if (/^(7|1)\d{8}$/.test(formattedPhone)) {
+        formattedPhone =
+          "254" + formattedPhone;
+      }
 
-  const user = await User.findByIdAndUpdate(
-    req.user._id,
-    { name, phone: formattedPhone, },
-    { new: true, runValidators: true, }
-  );
+      // Must now be 2547... or 2541...
+      else if (
+        !/^254(7|1)\d{8}$/.test(formattedPhone)
+      ) {
+        return res.status(400).json({
+          message:
+            "Enter a valid Safaricom phone number",
+        });
+      }
 
-  res.json(user);
+      updates.phone = formattedPhone;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        message: "No profile information provided",
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      updates,
+      {
+        new: true,
+        runValidators: true,
+      }
+    ).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json(user);
+  } catch (error) {
+    console.error(
+      "Update profile error:",
+      error
+    );
+
+    return res.status(500).json({
+      message: "Failed to update profile",
+    });
+  }
 };
 
 export const updateAvatar = async (req, res) => {
