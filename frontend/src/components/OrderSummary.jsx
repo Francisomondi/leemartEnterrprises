@@ -421,269 +421,448 @@ const OrderSummary = () => {
    * ==========================================================
    */
 
-  const handleMpesaPayment =
-    async () => {
-      /*
-       * Prevent accidental
-       * double submission.
-       */
-
-      if (loadingMpesa) {
-        return;
-      }
-
-      /*
-       * ======================================================
-       * PHONE
-       * ======================================================
-       */
-
-      if (!phone.trim()) {
-        setMpesaMessage(
-          "Enter M-PESA phone number"
-        );
-
-        return;
-      }
-
-      /*
-       * ======================================================
-       * DELIVERY LOCATION
-       * ======================================================
-       */
-
-      if (
-        !deliveryLocation
-      ) {
-        setMpesaMessage(
-          "Select delivery location"
-        );
-
-        return;
-      }
-
-      /*
-       * ======================================================
-       * CART
-       * ======================================================
-       */
-
-      if (
-        !Array.isArray(cart) ||
-        cart.length === 0
-      ) {
-        setMpesaMessage(
-          "Your cart is empty"
-        );
-
-        return;
-      }
-
-      /*
-       * ======================================================
-       * PHONE FORMAT
-       * ======================================================
-       */
-
-      const formattedPhone =
-        normalizePhone(phone);
-
-      /*
-       * Kenyan mobile numbers:
-       *
-       * 07XXXXXXXX
-       * 01XXXXXXXX
-       */
-
-      if (
-        !/^0(7|1)\d{8}$/.test(
-          formattedPhone
-        )
-      ) {
-        setMpesaMessage(
-          "Enter a valid Safaricom number"
-        );
-
-        return;
-      }
-
-      setLoadingMpesa(true);
-      setMpesaMessage("");
-
-      try {
-        /*
-         * ====================================================
-         * STEP 1
-         * CREATE ORDER
-         * ====================================================
-         */
-
-        const orderItems =
-          buildOrderItems();
-
-       const orderRes =
-        await axios.post(
-          "/orders",
-          {
-            items:
-              orderItems,
-
-            /*
-            * Send only the code.
-            *
-            * Backend determines whether it
-            * actually belongs to this user
-            * and what percentage it provides.
-            */
-
-            couponCode:
-              isCouponApplied &&
-              coupon?.code
-                ? coupon.code
-                : null,
-
-            deliveryDetails: {
-              location:
-                deliveryLocation,
-
-              phoneNumber:
-                formattedPhone,
-            },
-          },
-          {
-            withCredentials:
-              true,
-          }
-        );
-        /*
-         * New controller:
-         *
-         * {
-         *   success: true,
-         *   message: "...",
-         *   order: {...}
-         * }
-         */
-
-        const order =
-          orderRes.data?.order ||
-          orderRes.data;
-
-        const orderId =
-          order?._id;
-
-        if (!orderId) {
-          throw new Error(
-            "Order creation failed"
-          );
-        }
-
-        /*
-         * ====================================================
-         * BACKEND-CALCULATED TOTAL
-         * ====================================================
-         */
-
-        const serverTotal =
-          Number(
-            order.totalAmount
-          );
-
-        if (
-          !Number.isFinite(
-            serverTotal
-          ) ||
-          serverTotal <= 0
-        ) {
-          throw new Error(
-            "Invalid order total"
-          );
-        }
-
-        /*
-         * ====================================================
-         * STEP 2
-         * M-PESA STK PUSH
-         * ====================================================
-         *
-         * Use serverTotal, NOT finalTotal.
-         */
-
-        const stkRes =
-          await axios.post(
-            "/mpesa/stk",
-            {
-
-              orderId,
-            },
-            {
-              timeout: 20000,
-
-              withCredentials:
-                true,
-            }
-          );
-
-        const checkoutRequestID =
-          stkRes.data
-            ?.checkoutRequestID;
-
-        if (
-          !checkoutRequestID
-        ) {
-          throw new Error(
-            "M-PESA did not return a checkout request ID"
-          );
-        }
-
-        toast.success(
-          "Check your phone to complete payment"
-        );
-
-        setMpesaMessage(
-          "Waiting for M-PESA confirmation..."
-        );
-
-        /*
-         * ====================================================
-         * STEP 3
-         * POLL PAYMENT
-         * ====================================================
-         */
-
-        pollPaymentStatus(
-          checkoutRequestID
-        );
-      } catch (error) {
-        console.error(
-          "MPESA ERROR:",
-          error.response?.data ||
-            error.message
-        );
-
-        const message =
-          error.response?.data
-            ?.message ||
-          error.message ||
-          "Failed to initiate payment";
-
-        setMpesaMessage(
-          message
-        );
-
-        toast.error(message);
-      } finally {
-        setLoadingMpesa(
-          false
-        );
-      }
-    };
+const handleMpesaPayment = async () => {
+  /*
+   * Prevent accidental double submission.
+   */
+  if (loadingMpesa) {
+    return;
+  }
 
   /*
    * ==========================================================
-   * POLL PAYMENT STATUS
+   * PHONE
    * ==========================================================
    */
+
+  if (!phone.trim()) {
+    setMpesaMessage(
+      "Enter M-PESA phone number"
+    );
+
+    return;
+  }
+
+  /*
+   * ==========================================================
+   * DELIVERY LOCATION
+   * ==========================================================
+   */
+
+  if (!deliveryLocation) {
+    setMpesaMessage(
+      "Select delivery location"
+    );
+
+    return;
+  }
+
+  /*
+   * ==========================================================
+   * CART
+   * ==========================================================
+   */
+
+  if (
+    !Array.isArray(cart) ||
+    cart.length === 0
+  ) {
+    setMpesaMessage(
+      "Your cart is empty"
+    );
+
+    return;
+  }
+
+  /*
+   * ==========================================================
+   * NORMALIZE PHONE
+   * ==========================================================
+   */
+
+  const formattedPhone =
+    normalizePhone(phone);
+
+  /*
+   * Kenyan mobile:
+   *
+   * 07XXXXXXXX
+   * 01XXXXXXXX
+   */
+
+  if (
+    !/^0(7|1)\d{8}$/.test(
+      formattedPhone
+    )
+  ) {
+    setMpesaMessage(
+      "Enter a valid Safaricom number"
+    );
+
+    return;
+  }
+
+  setLoadingMpesa(true);
+  setMpesaMessage("");
+
+  try {
+    /*
+     * ========================================================
+     * STEP 1 — BUILD ORDER ITEMS
+     * ========================================================
+     */
+
+    const orderItems =
+      buildOrderItems();
+
+    /*
+     * ========================================================
+     * STEP 2 — CREATE ORDER
+     * ========================================================
+     *
+     * We deliberately do NOT send:
+     *
+     * - product prices
+     * - subtotal
+     * - discount amount
+     * - delivery fee
+     * - final total
+     *
+     * Backend calculates all monetary values.
+     */
+
+    const orderRes =
+      await axios.post(
+        "/orders",
+        {
+          items: orderItems,
+
+          /*
+           * Send only coupon code.
+           *
+           * Backend verifies ownership,
+           * validity and discount.
+           */
+          couponCode:
+            isCouponApplied &&
+            coupon?.code
+              ? coupon.code
+              : null,
+
+          deliveryDetails: {
+            location:
+              deliveryLocation,
+
+            phoneNumber:
+              formattedPhone,
+          },
+        },
+        {
+          withCredentials: true,
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+        }
+      );
+
+    /*
+     * ========================================================
+     * CREATED ORDER
+     * ========================================================
+     */
+
+    const createdOrder =
+      orderRes.data?.order ||
+      orderRes.data;
+
+    if (!createdOrder) {
+      console.error(
+        "INVALID ORDER RESPONSE:",
+        orderRes.data
+      );
+
+      throw new Error(
+        "Order was not returned by the server"
+      );
+    }
+
+    /*
+     * ========================================================
+     * ORDER ID
+     * ========================================================
+     */
+
+    const orderId =
+      createdOrder?._id;
+
+    if (!orderId) {
+      console.error(
+        "ORDER RESPONSE WITHOUT ID:",
+        orderRes.data
+      );
+
+      throw new Error(
+        "Order ID was not returned by the server"
+      );
+    }
+
+    /*
+     * ========================================================
+     * SERVER-CALCULATED TOTAL
+     * ========================================================
+     */
+
+    const serverTotal =
+      Number(
+        createdOrder.totalAmount
+      );
+
+    if (
+      !Number.isFinite(
+        serverTotal
+      ) ||
+      serverTotal <= 0
+    ) {
+      console.error(
+        "INVALID SERVER TOTAL:",
+        createdOrder
+      );
+
+      throw new Error(
+        "Invalid order total returned by server"
+      );
+    }
+
+    /*
+     * Helpful development logs.
+     */
+
+    console.log(
+      "CREATED ORDER:",
+      createdOrder
+    );
+
+    console.log(
+      "ORDER ID:",
+      orderId
+    );
+
+    console.log(
+      "SERVER TOTAL:",
+      serverTotal
+    );
+
+    console.log(
+      "M-PESA PHONE:",
+      formattedPhone
+    );
+
+    /*
+     * ========================================================
+     * STEP 3 — START M-PESA STK PUSH
+     * ========================================================
+     *
+     * IMPORTANT:
+     *
+     * Backend requires:
+     *
+     * {
+     *   phone,
+     *   orderId
+     * }
+     *
+     * Do NOT send amount.
+     *
+     * Backend loads MpesaOrder and gets
+     * totalAmount from MongoDB.
+     */
+
+    const stkRes =
+      await axios.post(
+        "/mpesa/stk",
+        {
+          phone:
+            formattedPhone,
+
+          orderId,
+        },
+        {
+          withCredentials: true,
+
+          timeout: 20000,
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+        }
+      );
+
+    console.log(
+      "STK RESPONSE:",
+      stkRes.data
+    );
+
+    /*
+     * ========================================================
+     * CHECKOUT REQUEST ID
+     * ========================================================
+     */
+
+    const checkoutRequestID =
+      stkRes.data
+        ?.checkoutRequestID;
+
+    if (!checkoutRequestID) {
+      console.error(
+        "INVALID STK RESPONSE:",
+        stkRes.data
+      );
+
+      throw new Error(
+        stkRes.data?.message ||
+          "M-PESA did not return a checkout request ID"
+      );
+    }
+
+    /*
+     * ========================================================
+     * STK STARTED
+     * ========================================================
+     */
+
+    toast.success(
+      "Check your phone to complete payment"
+    );
+
+    setMpesaMessage(
+      `M-PESA request sent. Confirm KES ${serverTotal.toLocaleString(
+        "en-KE"
+      )} on your phone.`
+    );
+
+    /*
+     * ========================================================
+     * STEP 4 — POLL PAYMENT STATUS
+     * ========================================================
+     */
+
+    pollPaymentStatus(
+      checkoutRequestID
+    );
+  } catch (error) {
+    /*
+     * ========================================================
+     * DETAILED ERROR LOGGING
+     * ========================================================
+     */
+
+    console.error(
+      "========== M-PESA CHECKOUT ERROR =========="
+    );
+
+    console.error(
+      "Full error:",
+      error
+    );
+
+    console.error(
+      "Status:",
+      error?.response?.status
+    );
+
+    console.error(
+      "Backend response:",
+      error?.response?.data
+    );
+
+    console.error(
+      "Backend message:",
+      error?.response?.data
+        ?.message
+    );
+
+    console.error(
+      "Request URL:",
+      error?.config?.url
+    );
+
+    console.error(
+      "Request method:",
+      error?.config?.method
+    );
+
+    console.error(
+      "Request data:",
+      error?.config?.data
+    );
+
+    console.error(
+      "Axios message:",
+      error?.message
+    );
+
+    console.error(
+      "=========================================="
+    );
+
+    /*
+     * ========================================================
+     * USER-FRIENDLY MESSAGE
+     * ========================================================
+     */
+
+    let message =
+      error?.response?.data
+        ?.message ||
+      error?.response?.data
+        ?.error ||
+      error?.message ||
+      "Failed to initiate payment";
+
+    /*
+     * Axios timeout.
+     *
+     * Do NOT tell customer payment failed,
+     * because Safaricom may still have
+     * received the STK request.
+     */
+    if (
+      error?.code ===
+      "ECONNABORTED"
+    ) {
+      message =
+        "M-PESA is taking longer than expected. Check your phone before trying again.";
+    }
+
+    /*
+     * Duplicate pending transaction.
+     */
+    if (
+      error?.response?.status ===
+      409
+    ) {
+      message =
+        error?.response?.data
+          ?.message ||
+        "An M-PESA request is already pending for this order. Check your phone.";
+    }
+
+    setMpesaMessage(
+      message
+    );
+
+    toast.error(
+      message
+    );
+  } finally {
+    setLoadingMpesa(false);
+  }
+};
+
+  
 
   const pollPaymentStatus = (
     checkoutRequestID
