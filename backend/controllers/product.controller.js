@@ -92,32 +92,335 @@ export const createProduct = async (req, res) => {
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, price, category } = req.body;
 
-    const updateData = { name, description, price, category };
+    /*
+     * ============================================================
+     * 1. FIND PRODUCT
+     * ============================================================
+     */
 
-    // if images are sent (optional)
-    if (req.body.images?.length) {
-      updateData.images = req.body.images;
-    }
-	Object.keys(updateData).forEach(
-  	(key) => updateData[key] === undefined && delete updateData[key]
-	);
-
-    const product = await Product.findByIdAndUpdate(
-      id,
-      updateData,
-       { new: true, runValidators: true }
-    );
+    const product = await Product.findById(id);
 
     if (!product) {
-      return res.status(404).json({ message: "Product not found" });
+      return res.status(404).json({
+        message: "Product not found",
+      });
     }
 
-    res.json(product);
+    /*
+     * ============================================================
+     * 2. GET FORM FIELDS
+     * ============================================================
+     */
+
+    const {
+      name,
+      description,
+      price,
+      category,
+      sizes,
+      colors,
+    } = req.body;
+
+    /*
+     * ============================================================
+     * 3. UPDATE BASIC PRODUCT INFORMATION
+     * ============================================================
+     */
+
+    if (name !== undefined) {
+      const trimmedName = String(name).trim();
+
+      if (!trimmedName) {
+        return res.status(400).json({
+          message: "Product name is required",
+        });
+      }
+
+      product.name = trimmedName;
+    }
+
+    if (description !== undefined) {
+      product.description =
+        String(description).trim();
+    }
+
+    if (category !== undefined) {
+      const trimmedCategory =
+        String(category).trim();
+
+      if (!trimmedCategory) {
+        return res.status(400).json({
+          message: "Product category is required",
+        });
+      }
+
+      product.category = trimmedCategory;
+    }
+
+    if (price !== undefined) {
+      const numericPrice = Number(price);
+
+      if (
+        !Number.isFinite(numericPrice) ||
+        numericPrice <= 0
+      ) {
+        return res.status(400).json({
+          message: "Enter a valid product price",
+        });
+      }
+
+      product.price = numericPrice;
+    }
+
+    /*
+     * ============================================================
+     * 4. UPDATE SIZES
+     * ============================================================
+     *
+     * Supports either:
+     *
+     * JSON.stringify(["S", "M", "L"])
+     *
+     * or an actual array.
+     */
+
+    if (sizes !== undefined) {
+      try {
+        if (Array.isArray(sizes)) {
+          product.sizes = sizes;
+        } else {
+          const parsedSizes = JSON.parse(sizes);
+
+          product.sizes = Array.isArray(
+            parsedSizes
+          )
+            ? parsedSizes
+            : [];
+        }
+      } catch {
+        /*
+         * Backward compatibility if the
+         * frontend sends a single value.
+         */
+        product.sizes = sizes
+          ? [String(sizes)]
+          : [];
+      }
+    }
+
+    /*
+     * ============================================================
+     * 5. UPDATE COLORS
+     * ============================================================
+     */
+
+    if (colors !== undefined) {
+      try {
+        if (Array.isArray(colors)) {
+          product.colors = colors;
+        } else {
+          const parsedColors = JSON.parse(colors);
+
+          product.colors = Array.isArray(
+            parsedColors
+          )
+            ? parsedColors
+            : [];
+        }
+      } catch {
+        product.colors = colors
+          ? [String(colors)]
+          : [];
+      }
+    }
+
+    /*
+     * ============================================================
+     * 6. DETERMINE WHICH EXISTING IMAGES TO KEEP
+     * ============================================================
+     */
+
+    const currentImages =
+      Array.isArray(product.images)
+        ? [...product.images]
+        : [];
+
+    let keptImages = [...currentImages];
+
+    if (
+      req.body.existingImages !== undefined
+    ) {
+      try {
+        const parsedImages = JSON.parse(
+          req.body.existingImages
+        );
+
+        if (!Array.isArray(parsedImages)) {
+          return res.status(400).json({
+            message:
+              "Invalid existing images data",
+          });
+        }
+
+        /*
+         * Only accept URLs already attached
+         * to this product.
+         *
+         * Prevents arbitrary URLs from being
+         * inserted through existingImages.
+         */
+        keptImages = parsedImages.filter(
+          (image) =>
+            typeof image === "string" &&
+            currentImages.includes(image)
+        );
+      } catch (error) {
+        return res.status(400).json({
+          message:
+            "Invalid existing images data",
+        });
+      }
+    }
+
+    /*
+     * ============================================================
+     * 7. CLOUDINARY UPLOAD HELPER
+     * ============================================================
+     *
+     * Same approach used by createProduct.
+     */
+
+    const uploadToCloudinary = (
+      fileBuffer
+    ) => {
+      return new Promise(
+        (resolve, reject) => {
+          const stream =
+            cloudinary.uploader.upload_stream(
+              {
+                folder: "products",
+              },
+              (error, result) => {
+                if (error) {
+                  return reject(error);
+                }
+
+                resolve(result);
+              }
+            );
+
+          stream.end(fileBuffer);
+        }
+      );
+    };
+
+    /*
+     * ============================================================
+     * 8. UPLOAD NEW IMAGES
+     * ============================================================
+     */
+
+    let newImageUrls = [];
+
+    if (
+      Array.isArray(req.files) &&
+      req.files.length > 0
+    ) {
+      /*
+       * Validate before uploading.
+       */
+      if (
+        keptImages.length +
+          req.files.length >
+        8
+      ) {
+        return res.status(400).json({
+          message:
+            "Maximum 8 product images allowed",
+        });
+      }
+
+      const uploadResults =
+        await Promise.all(
+          req.files.map((file) =>
+            uploadToCloudinary(
+              file.buffer
+            )
+          )
+        );
+
+      newImageUrls =
+        uploadResults.map(
+          (result) =>
+            result.secure_url
+        );
+    }
+
+    /*
+     * ============================================================
+     * 9. BUILD FINAL IMAGE ARRAY
+     * ============================================================
+     */
+
+    const finalImages = [
+      ...keptImages,
+      ...newImageUrls,
+    ];
+
+    if (finalImages.length === 0) {
+      return res.status(400).json({
+        message:
+          "Product must have at least one image",
+      });
+    }
+
+    if (finalImages.length > 8) {
+      return res.status(400).json({
+        message:
+          "Maximum 8 product images allowed",
+      });
+    }
+
+    product.images = finalImages;
+
+    /*
+     * ============================================================
+     * 10. SAVE PRODUCT
+     * ============================================================
+     */
+
+    const updatedProduct =
+      await product.save();
+
+    console.log(
+      `PRODUCT UPDATED: ${updatedProduct._id}`
+    );
+
+    /*
+     * ============================================================
+     * 11. RESPONSE
+     * ============================================================
+     */
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Product updated successfully",
+      product: updatedProduct,
+    });
   } catch (error) {
-    console.error("Update product error:", error.message);
-    res.status(500).json({ message: "Server error" });
+    console.error(
+      "UPDATE PRODUCT ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        error.message ||
+        "Failed to update product",
+    });
   }
 };
 
