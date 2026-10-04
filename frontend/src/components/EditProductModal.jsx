@@ -27,14 +27,40 @@ import { motion } from "framer-motion";
  * ============================================================
  */
 
-const DEFAULT_SIZES = [
+const PRODUCT_CATEGORIES = [
+  { value: "pants", label: "Pants" },
+  { value: "t-shirts", label: "T-Shirts" },
+  { value: "shoes", label: "Shoes" },
+  { value: "sandals", label: "Sandals" },
+  { value: "jackets", label: "Jackets" },
+  { value: "suits", label: "Suits" },
+  { value: "bags", label: "Bags" },
+  { value: "dresses", label: "Dresses" },
+  { value: "twopiece", label: "Two Piece" },
+  { value: "hoodies", label: "Hoodies" },
+  { value: "shorts", label: "Shorts" },
+  { value: "hats", label: "Hats" },
+];
+
+const SHOE_SIZES = Array.from(
+  { length: 9 },
+  (_, index) =>
+    String(index + 37)
+);
+
+const CLOTHING_SIZES = [
   "XS",
   "S",
   "M",
   "L",
   "XL",
-  "XXL",
+  "2XL",
   "3XL",
+];
+
+const SIZE_OPTIONAL_CATEGORIES = [
+  "bags",
+  "hats",
 ];
 
 /*
@@ -59,7 +85,55 @@ const DEFAULT_COLORS = [
   "Purple",
   "Yellow",
   "Orange",
+  "Maroon",
+  "jungle -green",
 ];
+
+/*
+ * ============================================================
+ * NORMALIZE LEGACY CATEGORY VALUES
+ * ============================================================
+ *
+ * Older products may contain categories such as:
+ *
+ * Pants
+ * Shorts
+ * Hats
+ * Two Piece
+ * two-piece
+ *
+ * New products use canonical lowercase values.
+ */
+
+const normalizeCategory = (category) => {
+  const value = String(
+    category || ""
+  )
+    .trim()
+    .toLowerCase();
+
+  const aliases = {
+    "two piece": "twopiece",
+    "two-piece": "twopiece",
+
+    tshirt: "t-shirts",
+    tshirts: "t-shirts",
+    "t-shirt": "t-shirts",
+
+    pant: "pants",
+    short: "shorts",
+    shoe: "shoes",
+    sandal: "sandals",
+    jacket: "jackets",
+    suit: "suits",
+    bag: "bags",
+    dress: "dresses",
+    hoodie: "hoodies",
+    hat: "hats",
+  };
+
+  return aliases[value] || value;
+};
 
 const EditProductModal = ({
   product,
@@ -126,6 +200,21 @@ const EditProductModal = ({
   const [previews, setPreviews] =
     useState([]);
 
+
+    const isFootwear = [
+      "shoes",
+      "sandals",
+    ].includes(formData.category);
+
+    const sizesOptional =
+      SIZE_OPTIONAL_CATEGORIES.includes(
+        formData.category
+      );
+
+    const availableSizes = isFootwear
+      ? SHOE_SIZES
+      : CLOTHING_SIZES;
+
   /*
    * ============================================================
    * LOAD EXISTING PRODUCT
@@ -138,8 +227,9 @@ const EditProductModal = ({
     setFormData({
       name: product.name || "",
       price: product.price || "",
-      category:
-        product.category || "",
+      category: normalizeCategory(
+        product.category
+      ),
       description:
         product.description || "",
     });
@@ -216,6 +306,27 @@ const EditProductModal = ({
     };
   }, [loading, onClose]);
 
+  const handleCategoryChange = (event) => {
+  const category = event.target.value;
+
+  setFormData((current) => ({
+    ...current,
+    category,
+  }));
+
+  /*
+   * Only reset sizes if the category
+   * has actually changed.
+   *
+   * This prevents shoe sizes from remaining
+   * when changing Shoes -> Dresses, etc.
+   */
+  if (category !== formData.category) {
+    setSelectedSizes([]);
+    setCustomSize("");
+  }
+};
+
   /*
    * ============================================================
    * NORMAL INPUT CHANGES
@@ -250,24 +361,25 @@ const EditProductModal = ({
     });
   };
 
-  const addCustomSize = () => {
-    const size =
-      customSize
-        .trim()
-        .toUpperCase();
+const addCustomSize = () => {
+  const raw = customSize.trim();
 
-    if (!size) return;
+  if (!raw) return;
 
-    setSelectedSizes((current) => {
-      if (current.includes(size)) {
-        return current;
-      }
+  const size = isFootwear
+    ? raw
+    : raw.toUpperCase();
 
-      return [...current, size];
-    });
+  setSelectedSizes((current) => {
+    if (current.includes(size)) {
+      return current;
+    }
 
-    setCustomSize("");
-  };
+    return [...current, size];
+  });
+
+  setCustomSize("");
+};
 
   const handleCustomSizeKeyDown = (
     event
@@ -503,6 +615,44 @@ const EditProductModal = ({
       );
       return;
     }
+
+    /*
+    * ============================================================
+    * VALIDATE SIZES
+    * ============================================================
+    *
+    * Bags and hats don't necessarily require sizes.
+    * All other categories must have at least one size.
+    */
+
+    if (
+      !sizesOptional &&
+      selectedSizes.length === 0
+    ) {
+      alert(
+        "Please select at least one size."
+      );
+      return;
+    }
+
+    /*
+    * ============================================================
+    * VALIDATE COLORS
+    * ============================================================
+    */
+
+    if (selectedColors.length === 0) {
+      alert(
+        "Please select at least one color."
+      );
+      return;
+    }
+
+    /*
+    * ============================================================
+    * VALIDATE IMAGES
+    * ============================================================
+    */
 
     const totalImages =
       existingImages.length +
@@ -1073,24 +1223,34 @@ const EditProductModal = ({
                   />
                 </Field>
 
-                <Field
-                  label="Category"
-                  icon={Tag}
+              <Field
+                label="Category"
+                icon={Tag}
+              >
+                <select
+                  name="category"
+                  required
+                  value={formData.category}
+                  onChange={handleCategoryChange}
+                  className={inputClass}
                 >
-                  <input
-                    name="category"
-                    required
-                    value={
-                      formData.category
-                    }
-                    onChange={
-                      handleChange
-                    }
-                    className={
-                      inputClass
-                    }
-                  />
-                </Field>
+                  <option value="">
+                    Select category
+                  </option>
+
+                  {PRODUCT_CATEGORIES.map(
+                    (category) => (
+                      <option
+                        key={category.value}
+                        value={category.value}
+                      >
+                        {category.label}
+                      </option>
+                    )
+                  )}
+                </select>
+              </Field>
+
               </div>
 
               <Field
@@ -1124,64 +1284,58 @@ const EditProductModal = ({
             <SectionHeader
               icon={Ruler}
               title="Available Sizes"
-              description="Tap sizes to make them available for this product."
+              description={
+                isFootwear
+                  ? "Select the available shoe sizes."
+                  : sizesOptional
+                  ? "Sizes are optional for this category."
+                  : "Select every size currently available."
+              }
             />
 
-            <div
-              className="
-                flex
-                flex-wrap
-                gap-2
-              "
-            >
-              {DEFAULT_SIZES.map(
-                (size) => {
-                  const selected =
-                    selectedSizes.includes(
-                      size
-                    );
+          <div className="flex flex-wrap gap-2">
+            {availableSizes.map((size) => {
+              const selected =
+                selectedSizes.includes(size);
 
-                  return (
-                    <button
-                      key={size}
-                      type="button"
-                      onClick={() =>
-                        toggleSize(
-                          size
-                        )
-                      }
-                      className={`
-                        min-w-[48px]
-                        min-h-[44px]
-                        px-3
-                        rounded-lg
-                        border
-                        font-semibold
-                        text-sm
-                        transition
+              return (
+                <button
+                  key={size}
+                  type="button"
+                  onClick={() =>
+                    toggleSize(size)
+                  }
+                  className={`
+                    min-w-[48px]
+                    min-h-[44px]
+                    px-3
+                    rounded-lg
+                    border
+                    font-semibold
+                    text-sm
+                    transition
 
-                        ${
-                          selected
-                            ? `
-                              bg-emerald-600
-                              border-emerald-500
-                              text-white
-                            `
-                            : `
-                              bg-gray-700
-                              border-gray-600
-                              text-gray-300
-                              hover:border-emerald-500
-                            `
-                        }
-                      `}
-                    >
-                      {size}
-                    </button>
-                  );
-                }
-              )}
-            </div>
+                    ${
+                      selected
+                        ? `
+                            bg-emerald-600
+                            border-emerald-500
+                            text-white
+                          `
+                        : `
+                            bg-gray-700
+                            border-gray-600
+                            text-gray-300
+                            hover:border-emerald-500
+                          `
+                    }
+                  `}
+                >
+                  {size}
+                </button>
+              );
+            })}
+          </div>
 
             {/* CUSTOM SIZES */}
 
@@ -1193,16 +1347,17 @@ const EditProductModal = ({
               "
             >
               <input
+                type={isFootwear ? "number" : "text"}
                 value={customSize}
                 onChange={(e) =>
-                  setCustomSize(
-                    e.target.value
-                  )
+                  setCustomSize(e.target.value)
                 }
-                onKeyDown={
-                  handleCustomSizeKeyDown
+                onKeyDown={handleCustomSizeKeyDown}
+                placeholder={
+                  isFootwear
+                    ? "Other shoe size e.g. 46"
+                    : "Custom size e.g. 4XL"
                 }
-                placeholder="Custom size e.g. 42"
                 className="
                   flex-1
                   min-w-0
@@ -1247,13 +1402,13 @@ const EditProductModal = ({
               </button>
             </div>
 
+            
+
             {/* CUSTOM SELECTED SIZES */}
 
             {selectedSizes.some(
               (size) =>
-                !DEFAULT_SIZES.includes(
-                  size
-                )
+                !availableSizes.includes(size)
             ) && (
               <div
                 className="
@@ -1266,18 +1421,14 @@ const EditProductModal = ({
                 {selectedSizes
                   .filter(
                     (size) =>
-                      !DEFAULT_SIZES.includes(
-                        size
-                      )
+                      !availableSizes.includes(size)
                   )
                   .map((size) => (
                     <button
                       key={size}
                       type="button"
                       onClick={() =>
-                        toggleSize(
-                          size
-                        )
+                        toggleSize(size)
                       }
                       className="
                         bg-emerald-600

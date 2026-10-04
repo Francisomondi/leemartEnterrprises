@@ -41,50 +41,194 @@ export const getFeaturedProducts = async (req, res) => {
 	}
 };
 
-export const createProduct = async (req, res) => {
+export const createProduct = async (
+  req,
+  res
+) => {
   try {
-    const { name, description, price, category } = req.body;
-
-    // 1️⃣ Validate images
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ message: "At least one image is required" });
-    }
-
-    // 2️⃣ Upload images to Cloudinary (CORRECT WAY)
-    const uploadToCloudinary = (fileBuffer) => {
-      return new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-          { folder: "products" },
-          (error, result) => {
-            if (error) return reject(error);
-            resolve(result);
-          }
-        );
-        stream.end(fileBuffer);
-      });
-    };
-
-    const uploadResults = await Promise.all(
-      req.files.map((file) => uploadToCloudinary(file.buffer))
-    );
-
-    const imageUrls = uploadResults.map((file) => file.secure_url);
-
-    // 3️⃣ Save product
-    const product = await Product.create({
+    const {
       name,
       description,
       price,
       category,
-      images: imageUrls,
-	  sizes: req.body.sizes || [],
-  	  colors: req.body.colors || [],
-    });
+    } = req.body;
 
-    res.status(201).json(product);
+    /*
+     * ==========================================================
+     * VALIDATE IMAGES
+     * ==========================================================
+     */
+
+    if (
+      !req.files ||
+      req.files.length === 0
+    ) {
+      return res.status(400).json({
+        message:
+          "At least one image is required",
+      });
+    }
+
+    /*
+     * ==========================================================
+     * PARSE ARRAY FIELDS
+     * ==========================================================
+     */
+
+    const parseArrayField = (
+      value
+    ) => {
+      if (!value) {
+        return [];
+      }
+
+      if (Array.isArray(value)) {
+        return value;
+      }
+
+      try {
+        const parsed =
+          JSON.parse(value);
+
+        return Array.isArray(parsed)
+          ? parsed
+          : [];
+      } catch {
+        return [String(value)];
+      }
+    };
+
+    const sizes =
+      parseArrayField(
+        req.body.sizes
+      );
+
+    const colors =
+      parseArrayField(
+        req.body.colors
+      );
+
+    /*
+     * ==========================================================
+     * VALIDATE PRICE
+     * ==========================================================
+     */
+
+    const numericPrice =
+      Number(price);
+
+    if (
+      !Number.isFinite(
+        numericPrice
+      ) ||
+      numericPrice <= 0
+    ) {
+      return res.status(400).json({
+        message:
+          "Enter a valid product price",
+      });
+    }
+
+    /*
+     * ==========================================================
+     * CLOUDINARY HELPER
+     * ==========================================================
+     */
+
+    const uploadToCloudinary = (
+      fileBuffer
+    ) => {
+      return new Promise(
+        (resolve, reject) => {
+          const stream =
+            cloudinary.uploader.upload_stream(
+              {
+                folder:
+                  "products",
+              },
+              (
+                error,
+                result
+              ) => {
+                if (error) {
+                  return reject(
+                    error
+                  );
+                }
+
+                resolve(result);
+              }
+            );
+
+          stream.end(
+            fileBuffer
+          );
+        }
+      );
+    };
+
+    /*
+     * ==========================================================
+     * UPLOAD IMAGES
+     * ==========================================================
+     */
+
+    const uploadResults =
+      await Promise.all(
+        req.files.map(
+          (file) =>
+            uploadToCloudinary(
+              file.buffer
+            )
+        )
+      );
+
+    const imageUrls =
+      uploadResults.map(
+        (result) =>
+          result.secure_url
+      );
+
+    /*
+     * ==========================================================
+     * CREATE PRODUCT
+     * ==========================================================
+     */
+
+    const product =
+      await Product.create({
+        name: String(name).trim(),
+
+        description:
+          String(
+            description || ""
+          ).trim(),
+
+        price: numericPrice,
+
+        category:
+          String(category).trim(),
+
+        images: imageUrls,
+
+        sizes,
+
+        colors,
+      });
+
+    return res
+      .status(201)
+      .json(product);
   } catch (error) {
-    console.error("Error in createProduct controller:", error);
-    res.status(500).json({ message: "Server error" });
+    console.error(
+      "Error in createProduct controller:",
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        "Failed to create product",
+    });
   }
 };
 
