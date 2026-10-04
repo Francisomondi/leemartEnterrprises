@@ -955,42 +955,108 @@ export const getOrderById = async (
  * ============================================================
  */
 
-export const getMyOrders = async (
-  req,
-  res
-) => {
+export const getMyOrders = async (req, res) => {
   try {
+    /*
+     * ========================================================
+     * AUTHENTICATION
+     * ========================================================
+     */
+
     if (!req.user?._id) {
       return res.status(401).json({
         success: false,
-        message:
-          "Authentication required",
+        message: "Authentication required",
       });
     }
 
-    const orders =
-      await MpesaOrder.find({
-        user:
-          req.user._id,
+    /*
+     * ========================================================
+     * GET CUSTOMER'S SUCCESSFUL ORDERS
+     * ========================================================
+     *
+     * Only return orders that have actually been confirmed
+     * as paid.
+     *
+     * This means the frontend does NOT need to decide what
+     * counts as a successful order.
+     */
+
+    const orders = await MpesaOrder.find({
+      user: req.user._id,
+
+      isPaid: true,
+
+      paymentStatus: "PAID",
+    })
+      /*
+       * ======================================================
+       * PRODUCT INFORMATION
+       * ======================================================
+       *
+       * IMPORTANT:
+       *
+       * size, color, quantity and price are stored directly
+       * on items[] as checkout snapshots.
+       *
+       * Product populate gives us current product metadata
+       * such as name and image.
+       */
+      .populate({
+        path: "items.product",
+
+        select:
+          "name price images category sizes colors",
       })
-        .populate(
-          "items.product",
-          "name price images category sizes colors"
-        )
-        .populate(
-          "coupon.couponId",
-          "code discountPercentage expirationDate isActive"
-        )
-        .sort({
-          createdAt: -1,
-        });
+
+      /*
+       * ======================================================
+       * COUPON
+       * ======================================================
+       */
+      .populate({
+        path: "coupon.couponId",
+
+        select:
+          "code discountPercentage expirationDate isActive",
+      })
+
+      /*
+       * ======================================================
+       * M-PESA TRANSACTION
+       * ======================================================
+       *
+       * Gives the profile access to payment information
+       * without having to match two separate requests.
+       */
+      .populate({
+        path: "mpesaTransaction",
+
+        select:
+          "status amount phoneNumber mpesaReceiptNumber createdAt updatedAt",
+      })
+
+      /*
+       * Most recently paid/purchased first.
+       */
+      .sort({
+        paidAt: -1,
+        createdAt: -1,
+      })
+      .lean();
+
+    /*
+     * ========================================================
+     * RESPONSE
+     * ========================================================
+     */
 
     return res.status(200).json({
       success: true,
-      count:
-        orders.length,
-      orders:
-        orders || [],
+
+      count: orders.length,
+
+      orders,
     });
   } catch (error) {
     console.error(
@@ -1000,6 +1066,7 @@ export const getMyOrders = async (
 
     return res.status(500).json({
       success: false,
+
       message:
         "Failed to fetch orders",
     });
