@@ -521,43 +521,40 @@ const OrderSummary = () => {
         const orderItems =
           buildOrderItems();
 
-        const orderRes =
-          await axios.post(
-            "/orders",
-            {
-              /*
-               * IMPORTANT:
-               *
-               * We do NOT send price.
-               *
-               * Backend reads the current
-               * price from MongoDB.
-               */
+       const orderRes =
+        await axios.post(
+          "/orders",
+          {
+            items:
+              orderItems,
 
-              items:
-                orderItems,
+            /*
+            * Send only the code.
+            *
+            * Backend determines whether it
+            * actually belongs to this user
+            * and what percentage it provides.
+            */
 
-              /*
-               * We also don't need to send
-               * totalAmount anymore.
-               *
-               * Backend calculates it.
-               */
+            couponCode:
+              isCouponApplied &&
+              coupon?.code
+                ? coupon.code
+                : null,
 
-              deliveryDetails: {
-                location:
-                  deliveryLocation,
+            deliveryDetails: {
+              location:
+                deliveryLocation,
 
-                phoneNumber:
-                  formattedPhone,
-              },
+              phoneNumber:
+                formattedPhone,
             },
-            {
-              withCredentials:
-                true,
-            }
-          );
-
+          },
+          {
+            withCredentials:
+              true,
+          }
+        );
         /*
          * New controller:
          *

@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 
 import MpesaTransaction from "../models/mpesaTransaction.model.js";
 import MpesaOrder from "../models/mpesaOrder.model.js";
+import Coupon from "../models/coupon.model.js";
 
 dotenv.config();
 

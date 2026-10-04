@@ -2,7 +2,11 @@ import mongoose from "mongoose";
 
 import MpesaOrder from "../models/mpesaOrder.model.js";
 import Product from "../models/product.model.js";
-import { getDeliveryLocation} from "../config/deliveryLocations.js";
+import Coupon from "../models/coupon.model.js";
+
+import {
+  getDeliveryLocation,
+} from "../config/deliveryLocations.js";
 
 /*
  * ============================================================
@@ -10,15 +14,23 @@ import { getDeliveryLocation} from "../config/deliveryLocations.js";
  * ============================================================
  */
 
-const normalizeSize = (value) => {
-  return String(value || "").trim();
-};
+const normalizeSize = (value) =>
+  String(value || "").trim();
 
-const normalizeColor = (value) => {
-  return String(value || "")
+const normalizeColor = (value) =>
+  String(value || "")
     .trim()
     .toLowerCase();
-};
+
+const normalizeCouponCode = (value) =>
+  String(value || "")
+    .trim()
+    .toUpperCase();
+
+const roundMoney = (value) =>
+  Math.round(
+    (Number(value) + Number.EPSILON) * 100
+  ) / 100;
 
 /*
  * ============================================================
@@ -28,14 +40,50 @@ const normalizeColor = (value) => {
 
 export const createMpesaOrder = async (req, res) => {
   try {
+    /*
+     * ========================================================
+     * AUTHENTICATION
+     * ========================================================
+     */
+
+    if (!req.user?._id) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+
+    /*
+     * ========================================================
+     * REQUEST BODY
+     * ========================================================
+     *
+     * Browser is allowed to send:
+     *
+     * - items
+     * - couponCode
+     * - delivery location
+     * - phone number
+     *
+     * Browser DOES NOT control:
+     *
+     * - product price
+     * - subtotal
+     * - coupon percentage
+     * - discount amount
+     * - delivery fee
+     * - total amount
+     */
+
     const {
       items,
+      couponCode,
       deliveryDetails,
     } = req.body;
 
     /*
      * ========================================================
-     * VALIDATE ORDER ITEMS
+     * VALIDATE ITEMS
      * ========================================================
      */
 
@@ -53,31 +101,19 @@ export const createMpesaOrder = async (req, res) => {
      * ========================================================
      * EXTRACT PRODUCT IDS
      * ========================================================
-     *
-     * Supports:
-     *
-     * {
-     *   product: "..."
-     * }
-     *
-     * {
-     *   productId: "..."
-     * }
-     *
-     * {
-     *   _id: "..."
-     * }
      */
 
     const productIds = items.map(
       (item) =>
-        item.product ||
-        item.productId ||
-        item._id
+        item?.product ||
+        item?.productId ||
+        item?._id
     );
 
     /*
-     * Validate MongoDB IDs.
+     * ========================================================
+     * VALIDATE PRODUCT IDS
+     * ========================================================
      */
 
     const invalidProductId =
@@ -102,15 +138,14 @@ export const createMpesaOrder = async (req, res) => {
      * FETCH PRODUCTS FROM DATABASE
      * ========================================================
      *
-     * Never trust prices sent from the browser.
+     * MongoDB is authoritative for price and variants.
      */
 
-    const products =
-      await Product.find({
-        _id: {
-          $in: productIds,
-        },
-      });
+    const products = await Product.find({
+      _id: {
+        $in: productIds,
+      },
+    });
 
     const productMap = new Map(
       products.map((product) => [
@@ -129,9 +164,9 @@ export const createMpesaOrder = async (req, res) => {
 
     for (const item of items) {
       const productId =
-        item.product ||
-        item.productId ||
-        item._id;
+        item?.product ||
+        item?.productId ||
+        item?._id;
 
       const product =
         productMap.get(
@@ -139,7 +174,7 @@ export const createMpesaOrder = async (req, res) => {
         );
 
       /*
-       * Product may have been deleted after
+       * Product may have been removed after
        * being added to the customer's cart.
        */
 
@@ -158,7 +193,7 @@ export const createMpesaOrder = async (req, res) => {
        */
 
       const quantity =
-        Number(item.quantity);
+        Number(item?.quantity);
 
       if (
         !Number.isInteger(quantity) ||
@@ -166,26 +201,29 @@ export const createMpesaOrder = async (req, res) => {
       ) {
         return res.status(400).json({
           success: false,
-          message: `Invalid quantity for ${product.name}`,
+          message:
+            `Invalid quantity for ${product.name}`,
         });
       }
 
       /*
-       * Optional stock validation.
+       * ======================================================
+       * STOCK
+       * ======================================================
        *
-       * Your previous Product code allowed stock to be
-       * undefined, so only enforce it when it exists.
+       * Only checked if this Product model actually
+       * has a stock value.
        */
 
       if (
         product.stock !== undefined &&
         product.stock !== null &&
-        Number(product.stock) <
-          quantity
+        Number(product.stock) < quantity
       ) {
         return res.status(400).json({
           success: false,
-          message: `Only ${product.stock} item(s) of ${product.name} are available`,
+          message:
+            `Only ${product.stock} item(s) of ${product.name} are available`,
         });
       }
 
@@ -196,7 +234,7 @@ export const createMpesaOrder = async (req, res) => {
        */
 
       const selectedSize =
-        normalizeSize(item.size);
+        normalizeSize(item?.size);
 
       const availableSizes =
         Array.isArray(product.sizes)
@@ -208,15 +246,16 @@ export const createMpesaOrder = async (req, res) => {
           : [];
 
       /*
-       * If the product has sizes configured,
-       * a size MUST be supplied.
+       * If the product has configured sizes,
+       * a size must be selected.
        */
 
       if (availableSizes.length > 0) {
         if (!selectedSize) {
           return res.status(400).json({
             success: false,
-            message: `Please select a size for ${product.name}`,
+            message:
+              `Please select a size for ${product.name}`,
           });
         }
 
@@ -227,7 +266,8 @@ export const createMpesaOrder = async (req, res) => {
         ) {
           return res.status(400).json({
             success: false,
-            message: `Size ${selectedSize} is not available for ${product.name}`,
+            message:
+              `Size ${selectedSize} is not available for ${product.name}`,
           });
         }
       }
@@ -239,13 +279,17 @@ export const createMpesaOrder = async (req, res) => {
        */
 
       const selectedColor =
-        String(item.color || "").trim();
+        String(
+          item?.color || ""
+        ).trim();
 
       const availableColors =
         Array.isArray(product.colors)
           ? product.colors
               .map((color) =>
-                String(color || "").trim()
+                String(
+                  color || ""
+                ).trim()
               )
               .filter(Boolean)
           : [];
@@ -254,30 +298,21 @@ export const createMpesaOrder = async (req, res) => {
         selectedColor;
 
       /*
-       * If colors exist on the product,
-       * a color MUST be supplied.
+       * If product has configured colors,
+       * a color must be selected.
        */
 
-      if (
-        availableColors.length > 0
-      ) {
+      if (availableColors.length > 0) {
         if (!selectedColor) {
           return res.status(400).json({
             success: false,
-            message: `Please select a color for ${product.name}`,
+            message:
+              `Please select a color for ${product.name}`,
           });
         }
 
         /*
-         * Compare case-insensitively.
-         *
-         * Example:
-         *
-         * "black"
-         *
-         * matches:
-         *
-         * "Black"
+         * Compare colors case-insensitively.
          */
 
         const matchingColor =
@@ -292,13 +327,24 @@ export const createMpesaOrder = async (req, res) => {
         if (!matchingColor) {
           return res.status(400).json({
             success: false,
-            message: `Color ${selectedColor} is not available for ${product.name}`,
+            message:
+              `Color ${selectedColor} is not available for ${product.name}`,
           });
         }
 
         /*
-         * Save the canonical value from
-         * the Product document.
+         * Store the canonical Product value.
+         *
+         * Example:
+         *
+         * Customer sends:
+         *   "black"
+         *
+         * Product contains:
+         *   "Black"
+         *
+         * Order stores:
+         *   "Black"
          */
 
         finalColor =
@@ -307,10 +353,10 @@ export const createMpesaOrder = async (req, res) => {
 
       /*
        * ======================================================
-       * PRICE
+       * PRODUCT PRICE
        * ======================================================
        *
-       * Use MongoDB price, NOT item.price from frontend.
+       * NEVER use item.price from the browser.
        */
 
       const price =
@@ -322,94 +368,249 @@ export const createMpesaOrder = async (req, res) => {
       ) {
         return res.status(400).json({
           success: false,
-          message: `Invalid price for ${product.name}`,
+          message:
+            `Invalid price for ${product.name}`,
         });
       }
 
       /*
        * ======================================================
-       * CREATE ORDER LINE
+       * ORDER ITEM SNAPSHOT
        * ======================================================
        */
 
       orderItems.push({
-        product: product._id,
+        product:
+          product._id,
 
         quantity,
 
         price,
 
-        size: selectedSize,
+        size:
+          selectedSize,
 
-        color: finalColor,
+        color:
+          finalColor,
       });
     }
 
     /*
      * ========================================================
-     * PRODUCT SUBTOTAL
+     * SUBTOTAL
      * ========================================================
+     *
+     * Calculated exclusively from trusted database prices.
      */
 
     const subtotal =
-      orderItems.reduce(
-        (total, item) =>
-          total +
-          item.price *
-            item.quantity,
-        0
+      roundMoney(
+        orderItems.reduce(
+          (
+            runningTotal,
+            item
+          ) =>
+            runningTotal +
+            Number(item.price) *
+              Number(item.quantity),
+          0
+        )
       );
 
-  
+    /*
+     * ========================================================
+     * COUPON
+     * ========================================================
+     */
 
+    let appliedCoupon =
+      null;
+
+    let discountPercentage =
+      0;
+
+    let discountAmount =
+      0;
+
+    const normalizedCouponCode =
+      normalizeCouponCode(
+        couponCode
+      );
+
+    /*
+     * Coupon is optional.
+     */
+
+    if (normalizedCouponCode) {
       /*
-      * ============================================================
-      * DELIVERY LOCATION
-      * ============================================================
-      */
+       * Coupon MUST:
+       *
+       * - match the supplied code
+       * - belong to authenticated user
+       * - currently be active
+       */
 
-      const requestedLocation =
-        String(
-          deliveryDetails?.location || ""
-        ).trim();
+      const coupon =
+        await Coupon.findOne({
+          code:
+            normalizedCouponCode,
 
-      if (!requestedLocation) {
+          userId:
+            req.user._id,
+
+          isActive:
+            true,
+        });
+
+      if (!coupon) {
         return res.status(400).json({
           success: false,
           message:
-            "Delivery location is required",
+            "Coupon is invalid or no longer available",
         });
       }
 
       /*
-      * Look up the location using the SERVER'S
-      * delivery configuration.
-      */
+       * ======================================================
+       * EXPIRATION
+       * ======================================================
+       */
 
-      const selectedDeliveryLocation =
-        getDeliveryLocation(
-          requestedLocation
+      if (
+        coupon.expirationDate <
+        new Date()
+      ) {
+        /*
+         * Expired coupons are deactivated.
+         */
+
+        coupon.isActive =
+          false;
+
+        await coupon.save();
+
+        return res.status(400).json({
+          success: false,
+          message:
+            "Coupon has expired",
+        });
+      }
+
+      /*
+       * ======================================================
+       * DISCOUNT PERCENTAGE
+       * ======================================================
+       *
+       * Comes from MongoDB.
+       *
+       * Never use a percentage supplied by React.
+       */
+
+      discountPercentage =
+        Number(
+          coupon.discountPercentage
         );
 
-      if (!selectedDeliveryLocation) {
+      if (
+        !Number.isFinite(
+          discountPercentage
+        ) ||
+        discountPercentage < 0 ||
+        discountPercentage > 100
+      ) {
         return res.status(400).json({
           success: false,
           message:
-            "Invalid delivery location",
+            "Coupon discount is invalid",
         });
       }
 
       /*
-      * IMPORTANT:
-      *
-      * This value comes from the server.
-      *
-      * We completely ignore:
-      *
-      * req.body.deliveryDetails.deliveryFee
-      */
+       * ======================================================
+       * DISCOUNT AMOUNT
+       * ======================================================
+       */
 
-      const deliveryFee = selectedDeliveryLocation.fee;
+      discountAmount =
+        roundMoney(
+          subtotal *
+            (
+              discountPercentage /
+              100
+            )
+        );
+
+      appliedCoupon =
+        coupon;
+    }
+
+    /*
+     * ========================================================
+     * DISCOUNTED SUBTOTAL
+     * ========================================================
+     */
+
+    const discountedSubtotal =
+      roundMoney(
+        Math.max(
+          0,
+          subtotal -
+            discountAmount
+        )
+      );
+
+    /*
+     * ========================================================
+     * DELIVERY LOCATION
+     * ========================================================
+     */
+
+    const requestedLocation =
+      String(
+        deliveryDetails?.location ||
+          ""
+      ).trim();
+
+    if (!requestedLocation) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Delivery location is required",
+      });
+    }
+
+    /*
+     * Resolve delivery location from
+     * SERVER configuration.
+     */
+
+    const selectedDeliveryLocation =
+      getDeliveryLocation(
+        requestedLocation
+      );
+
+    if (
+      !selectedDeliveryLocation
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid delivery location",
+      });
+    }
+
+    /*
+     * ========================================================
+     * DELIVERY FEE
+     * ========================================================
+     *
+     * Browser-provided deliveryFee is completely ignored.
+     */
+
+    const deliveryFee =
+      Number(
+        selectedDeliveryLocation.fee
+      );
 
     if (
       !Number.isFinite(
@@ -417,29 +618,60 @@ export const createMpesaOrder = async (req, res) => {
       ) ||
       deliveryFee < 0
     ) {
-      return res.status(400).json({
+      return res.status(500).json({
         success: false,
         message:
-          "Invalid delivery fee",
+          "Invalid server delivery configuration",
       });
     }
 
     /*
      * ========================================================
-     * TOTAL
+     * FINAL TOTAL
      * ========================================================
      *
-     * IMPORTANT:
-     *
-     * We no longer trust:
-     *
-     * req.body.totalAmount
-     *
-     * Product prices are calculated from MongoDB.
+     * subtotal
+     * - discount
+     * + delivery
      */
 
     const totalAmount =
-      subtotal + deliveryFee;
+      roundMoney(
+        discountedSubtotal +
+          deliveryFee
+      );
+
+    /*
+     * M-PESA payment must have a positive value.
+     */
+
+    if (
+      !Number.isFinite(
+        totalAmount
+      ) ||
+      totalAmount < 1
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Order total must be at least KES 1",
+      });
+    }
+
+    /*
+     * ========================================================
+     * PHONE SNAPSHOT
+     * ========================================================
+     *
+     * Actual M-PESA phone validation is still performed
+     * by the M-PESA controller.
+     */
+
+    const phoneNumber =
+      String(
+        deliveryDetails
+          ?.phoneNumber || ""
+      ).trim();
 
     /*
      * ========================================================
@@ -449,48 +681,100 @@ export const createMpesaOrder = async (req, res) => {
 
     const order =
       await MpesaOrder.create({
-        user: req.user._id,
+        user:
+          req.user._id,
 
-        items: orderItems,
+        items:
+          orderItems,
+
+        /*
+         * ====================================================
+         * PRICING SNAPSHOT
+         * ====================================================
+         */
+
+        subtotal,
+
+        discountAmount,
+
+        coupon:
+          appliedCoupon
+            ? {
+                couponId:
+                  appliedCoupon._id,
+
+                code:
+                  appliedCoupon.code,
+
+                discountPercentage,
+              }
+            : {
+                couponId:
+                  null,
+
+                code:
+                  null,
+
+                discountPercentage:
+                  0,
+              },
 
         totalAmount,
 
+        /*
+         * ====================================================
+         * DELIVERY SNAPSHOT
+         * ====================================================
+         */
+
         deliveryDetails: {
           location:
-            deliveryDetails?.location ||
-            "",
+            selectedDeliveryLocation.name,
 
           deliveryFee,
 
-          phoneNumber:
-            deliveryDetails
-              ?.phoneNumber || "",
+          phoneNumber,
         },
 
-        paymentMethod: "MPESA",
+        /*
+         * ====================================================
+         * PAYMENT
+         * ====================================================
+         */
 
-        paymentStatus: "PENDING",
+        paymentMethod:
+          "MPESA",
 
-        isPaid: false,
+        paymentStatus:
+          "PENDING",
+
+        isPaid:
+          false,
       });
 
     /*
      * ========================================================
-     * RESPONSE
+     * IMPORTANT
      * ========================================================
+     *
+     * DO NOT deactivate the coupon here.
+     *
+     * Creating an order does not mean the customer
+     * completed the M-PESA payment.
+     *
+     * Coupon consumption occurs only after a verified
+     * successful M-PESA callback.
      */
 
     return res.status(201).json({
       success: true,
-
       message:
         "Order created successfully",
-
       order,
     });
   } catch (error) {
     console.error(
-      "CREATE ORDER ERROR:",
+      "CREATE M-PESA ORDER ERROR:",
       error
     );
 
@@ -515,7 +799,8 @@ export const getSuccessfulOrders = async (
   try {
     const orders =
       await MpesaOrder.find({
-        paymentStatus: "PAID",
+        paymentStatus:
+          "PAID",
       })
         .populate(
           "user",
@@ -525,18 +810,24 @@ export const getSuccessfulOrders = async (
           "items.product",
           "name price images category sizes colors"
         )
+        .populate(
+          "coupon.couponId",
+          "code discountPercentage expirationDate isActive"
+        )
         .sort({
           createdAt: -1,
         });
 
     return res.status(200).json({
       success: true,
-      count: orders.length,
-      orders,
+      count:
+        orders.length,
+      orders:
+        orders || [],
     });
   } catch (error) {
     console.error(
-      "GET ORDERS ERROR:",
+      "GET SUCCESSFUL ORDERS ERROR:",
       error
     );
 
@@ -560,7 +851,7 @@ export const getOrderById = async (
 ) => {
   try {
     /*
-     * Validate ID before asking Mongoose
+     * Validate ID before Mongoose attempts
      * to cast it.
      */
 
@@ -571,7 +862,8 @@ export const getOrderById = async (
     ) {
       return res.status(400).json({
         success: false,
-        message: "Invalid order ID",
+        message:
+          "Invalid order ID",
       });
     }
 
@@ -586,12 +878,17 @@ export const getOrderById = async (
         .populate(
           "items.product",
           "name price images category sizes colors"
+        )
+        .populate(
+          "coupon.couponId",
+          "code discountPercentage expirationDate isActive"
         );
 
     if (!order) {
       return res.status(404).json({
         success: false,
-        message: "Order not found",
+        message:
+          "Order not found",
       });
     }
 
@@ -600,29 +897,37 @@ export const getOrderById = async (
      * SECURITY
      * ========================================================
      *
-     * Customer:
-     *   can only view own order.
-     *
      * Admin:
      *   can view any order.
+     *
+     * Customer:
+     *   can view only own order.
      */
 
     const orderUserId =
       order.user?._id
-        ? String(order.user._id)
-        : String(order.user);
+        ? String(
+            order.user._id
+          )
+        : String(
+            order.user
+          );
 
     const currentUserId =
-      String(req.user._id);
+      String(
+        req.user._id
+      );
 
     if (
-      req.user.role !== "admin" &&
+      req.user.role !==
+        "admin" &&
       orderUserId !==
         currentUserId
     ) {
       return res.status(403).json({
         success: false,
-        message: "Unauthorized",
+        message:
+          "Unauthorized",
       });
     }
 
@@ -655,13 +960,26 @@ export const getMyOrders = async (
   res
 ) => {
   try {
+    if (!req.user?._id) {
+      return res.status(401).json({
+        success: false,
+        message:
+          "Authentication required",
+      });
+    }
+
     const orders =
       await MpesaOrder.find({
-        user: req.user._id,
+        user:
+          req.user._id,
       })
         .populate(
           "items.product",
           "name price images category sizes colors"
+        )
+        .populate(
+          "coupon.couponId",
+          "code discountPercentage expirationDate isActive"
         )
         .sort({
           createdAt: -1,
@@ -669,8 +987,10 @@ export const getMyOrders = async (
 
     return res.status(200).json({
       success: true,
-      count: orders.length,
-      orders,
+      count:
+        orders.length,
+      orders:
+        orders || [],
     });
   } catch (error) {
     console.error(
